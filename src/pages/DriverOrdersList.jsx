@@ -1,19 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box,
-  Container,
-  Fade,
-  Typography,
-  Button,
-  alpha,
-  Chip,
-  CircularProgress,
-  useMediaQuery,
-  useTheme,
-  IconButton,
-  Menu,
-  MenuItem,
+  Box, Container, Fade, Typography, Button, alpha, Chip,
+  CircularProgress, useMediaQuery, useTheme, IconButton, Menu, MenuItem,
 } from "@mui/material";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
@@ -23,9 +12,12 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
-
+import PaymentIcon from "@mui/icons-material/Payment";
 import axios from "axios";
-import { styles, THEME_PURPLE, LIGHT_PURPLE_BG } from "../theme/theme";
+import { C, FONT, R, bannerGradient } from "../theme/ccTheme";
+
+const P = C.purple;
+const T = C.teal;
 
 function stateLabel(s) {
   if (s === "waiting_for_approve") return "Pending Approval";
@@ -40,741 +32,209 @@ export default function DriverAssignmentsList() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
-  const [filter, setFilter] = useState(() => {
-    const savedFilter = localStorage.getItem("assignmentFilter");
-    return savedFilter || "assigned";
-  });
+  const [filter, setFilter] = useState(() => localStorage.getItem("assignmentFilter") || "assigned");
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const scrollContainerRef = useRef(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [userName, setUserName] = useState("");
+  const scrollRef = useRef(null);
 
   const driverId = JSON.parse(localStorage.getItem("user_data"))?.id;
-  const userData = JSON.parse(localStorage.getItem('user_data') || 'null');
+  const userData = JSON.parse(localStorage.getItem("user_data") || "null");
+
+  useEffect(() => {
+    const ud = JSON.parse(localStorage.getItem("user_data") || "null");
+    if (ud?.name) setUserName(ud.name);
+  }, []);
+
   if (!userData?.isDriver) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Box sx={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
         <Typography color="error">Access denied.</Typography>
       </Box>
     );
   }
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogoutClick = () => {
-    handleMenuClose();
-    localStorage.removeItem("user_data");
-    navigate("/login");
-  };
-
   const load = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+    if (!driverId) { setLoading(false); setRefreshing(false); return; }
 
-    if (!driverId) {
-      console.error("Driver ID not found in localStorage");
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+    const endpointMap = {
+      assigned: "/api/driver/tasks/assigned",
+      in_delivery: "/api/driver/tasks/pending",
+      done: "/api/driver/tasks/done",
+    };
 
     try {
-      let endpoint = "";
-
-      if (filter === "assigned") {
-        endpoint = "/api/driver/tasks/assigned";
-      } else if (filter === "in_delivery") {
-        endpoint = "/api/driver/tasks/pending";
-      } else {
-        endpoint = "/api/driver/tasks/done";
-      }
-
-      const response = await axios.post(
-        endpoint,
+      const res = await axios.post(
+        endpointMap[filter],
         { params: { driver_id: driverId } },
-        {
-          withCredentials: true,
-          headers: { "Content-Type": "application/json" },
-        }
+        { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
-
-      if (response.data.result?.status === "success") {
-        const result = response.data.result?.result;
-        let data = [];
-        if (Array.isArray(result)) {
-          data = result;
-        } else if (result?.assignment) {
-          data = result.assignment;
-        } else if (result?.tasks) {
-          data = result.tasks;
-        }
+      if (res.data.result?.status === "success") {
+        const result = res.data.result?.result;
+        const data = Array.isArray(result) ? result : result?.assignment || result?.tasks || [];
         setAssignments(data);
       } else {
-        console.error("API Error:", response.data.result?.message);
         setAssignments([]);
       }
-    } catch (error) {
-      console.error("Error loading assignments:", error);
-      setAssignments([]);
-    }
+    } catch { setAssignments([]); }
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, driverId]);
+  useEffect(() => { load(); }, [filter, driverId]);
 
-  const handleFilterChange = (newFilter) => {
-    setFilter(newFilter);
-    localStorage.setItem("assignmentFilter", newFilter);
-  };
-
-  const handlePullToRefresh = (e) => {
-    if (scrollContainerRef.current?.scrollTop === 0) {
-      load(true);
-    }
-  };
+  const handleFilter = (val) => { setFilter(val); localStorage.setItem("assignmentFilter", val); };
+  const handleLogout = () => { setAnchorEl(null); localStorage.removeItem("user_data"); navigate("/login"); };
 
   const headerText = useMemo(() => {
-    if (filter === "assigned")
-      return "Assignments waiting for your approval";
+    if (filter === "assigned") return "Assignments waiting for your approval";
     if (filter === "in_delivery") return "Assignments in progress";
     return "Your completed assignments";
   }, [filter]);
 
   const filterOptions = [
-    {
-      value: "assigned",
-      icon: <PendingActionsIcon sx={{ fontSize: isMobile ? 18 : 20 }} />,
-      label: "Assigned",
-    },
-    {
-      value: "in_delivery",
-      icon: <LocalShippingIcon sx={{ fontSize: isMobile ? 18 : 20 }} />,
-      label: "In Delivery",
-    },
-    {
-      value: "done",
-      icon: <DoneAllIcon sx={{ fontSize: isMobile ? 18 : 20 }} />,
-      label: "Done",
-    },
+    { value: "assigned", icon: <PendingActionsIcon sx={{ fontSize: isMobile ? 17 : 19 }} />, label: "Assigned" },
+    { value: "in_delivery", icon: <LocalShippingIcon sx={{ fontSize: isMobile ? 17 : 19 }} />, label: "In Delivery" },
+    { value: "done", icon: <DoneAllIcon sx={{ fontSize: isMobile ? 17 : 19 }} />, label: "Done" },
   ];
 
   return (
-    <Box
-      sx={{
-        ...styles.pageBg,
-        background: `linear-gradient(135deg, ${LIGHT_PURPLE_BG} 0%, #ffffff 100%)`,
-        minHeight: "100vh",
-      }}
-    >
-      <Box
-        ref={scrollContainerRef}
-        onScroll={handlePullToRefresh}
-        sx={{
-          height: "100vh",
-          overflowY: "auto",
-          overflowX: "hidden",
-          scrollBehavior: "smooth",
-          "&::-webkit-scrollbar": {
-            width: isMobile ? "4px" : "6px",
-          },
-          "&::-webkit-scrollbar-track": {
-            background: "transparent",
-          },
-          "&::-webkit-scrollbar-thumb": {
-            background: alpha(THEME_PURPLE, 0.3),
-            borderRadius: "10px",
-            "&:hover": {
-              background: alpha(THEME_PURPLE, 0.5),
-            },
-          },
-        }}
-      >
-        <Container maxWidth="md" sx={{ pb: 4 }}>
-          <Fade in timeout={500}>
+    <Box sx={{ minHeight: "100vh", background: `linear-gradient(135deg, ${alpha(P, 0.04)} 0%, white 60%, ${alpha(T, 0.03)} 100%)`, fontFamily: FONT }}>
+      <Box ref={scrollRef} sx={{ height: "100vh", overflowY: "auto", overflowX: "hidden", "&::-webkit-scrollbar": { width: 4 }, "&::-webkit-scrollbar-thumb": { background: alpha(P, 0.25), borderRadius: 10 } }}>
+        <Container maxWidth="md" sx={{ pb: 5, px: isMobile ? 1.5 : 2 }}>
+          <Fade in timeout={400}>
             <Box>
-              {/* Top Menu Bar */}
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  pt: isMobile ? 2 : 2.5,
-                  pb: isMobile ? 1.5 : 2,
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1.5,
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      sx={{
-                        color: "#9e9e9e",
-                        fontSize: isMobile ? 12 : 13,
-                        mb: 0.3,
-                      }}
-                    >
-                      Welcome back,
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: "#2d2d2d",
-                        fontWeight: 700,
-                        fontSize: isMobile ? 15 : 17,
-                        letterSpacing: "-0.5px",
-                      }}
-                    >
-                      {userName || "Driver"}
-                    </Typography>
-                  </Box>
+              {/* Top bar */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pt: isMobile ? 2 : 2.5, pb: isMobile ? 1.5 : 2 }}>
+                <Box>
+                  <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.muted }}>Welcome back,</Typography>
+                  <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 16 : 18, color: C.text, letterSpacing: "-0.3px" }}>{userName || "Driver"}</Typography>
                 </Box>
-
-                <IconButton
-                  onClick={handleMenuOpen}
-                  sx={{
-                    color: THEME_PURPLE,
-                    backgroundColor: alpha(THEME_PURPLE, 0.08),
-                    borderRadius: "12px",
-                    p: 1.5,
-                    transition: "all 0.3s ease",
-                    "&:hover": {
-                      backgroundColor: alpha(THEME_PURPLE, 0.15),
-                      transform: "rotate(20deg)",
-                    },
-                  }}
-                >
-                  <SettingsIcon sx={{ fontSize: 24 }} />
+                <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}
+                  sx={{ color: T, backgroundColor: alpha(T, 0.08), borderRadius: "12px", p: 1.25, border: `1.5px solid ${alpha(T, 0.18)}`, transition: "all 0.3s ease", "&:hover": { backgroundColor: alpha(T, 0.15), transform: "rotate(22deg)" } }}>
+                  <SettingsIcon sx={{ fontSize: 22 }} />
                 </IconButton>
-
-                <Menu
-                  anchorEl={anchorEl}
-                  open={Boolean(anchorEl)}
-                  onClose={handleMenuClose}
-                  PaperProps={{
-                    sx: {
-                      borderRadius: "12px",
-                      mt: 1,
-                      boxShadow: "0 8px 24px rgba(126, 87, 194, 0.2)",
-                      "& .MuiMenuItem-root": {
-                        fontSize: "14px",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          backgroundColor: alpha(THEME_PURPLE, 0.08),
-                        },
-                      },
-                    },
-                  }}
-                >
-                  <MenuItem
-                    onClick={handleLogoutClick}
-                    sx={{ color: "#c62828" }}
-                  >
-                    <LogoutIcon sx={{ mr: 1.5, fontSize: 20 }} />
-                    Logout
+                <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
+                  PaperProps={{ sx: { borderRadius: R.cardSm, mt: 1, boxShadow: `0 8px 24px ${alpha(P, 0.18)}`, "& .MuiMenuItem-root": { fontFamily: FONT, fontSize: 14 } } }}>
+                  <MenuItem onClick={handleLogout} sx={{ color: C.red, gap: 1 }}>
+                    <LogoutIcon sx={{ fontSize: 18 }} /> Logout
                   </MenuItem>
                 </Menu>
               </Box>
 
-              {/* Header Section */}
-              <Box
-                sx={{
-                  pt: isMobile ? 1.5 : 2,
-                  pb: isMobile ? 1.5 : 2,
-                  position: "sticky",
-                  top: 0,
-                  background: `linear-gradient(135deg, ${LIGHT_PURPLE_BG} 0%, #ffffff 100%)`,
-                  backdropFilter: "blur(8px)",
-                  zIndex: 10,
-                  borderBottom: `1px solid ${alpha(THEME_PURPLE, 0.1)}`,
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: isMobile ? 1 : 1.5,
-                    mb: isMobile ? 1.5 : 2,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: isMobile ? 40 : 48,
-                      height: isMobile ? 40 : 48,
-                      borderRadius: "12px",
-                      background: `linear-gradient(135deg, ${alpha(
-                        THEME_PURPLE,
-                        0.15
-                      )}, ${alpha(THEME_PURPLE, 0.05)})`,
-                    }}
-                  >
-                    <LocalShippingIcon
-                      sx={{
-                        color: THEME_PURPLE,
-                        fontSize: isMobile ? 24 : 28,
-                      }}
-                    />
+              {/* Header + filters — sticky */}
+              <Box sx={{ position: "sticky", top: 0, background: `linear-gradient(135deg, ${alpha(P, 0.04)} 0%, white 80%)`, backdropFilter: "blur(8px)", zIndex: 10, pt: 1, pb: 1.5, borderBottom: `1px solid ${alpha(P, 0.08)}`, mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+                  <Box sx={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: "12px", background: `linear-gradient(135deg, ${alpha(P, 0.14)}, ${alpha(T, 0.08)})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <LocalShippingIcon sx={{ color: P, fontSize: isMobile ? 22 : 26 }} />
                   </Box>
                   <Box>
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: isMobile ? 18 : 22,
-                        color: "#2d2d2d",
-                        letterSpacing: "-0.5px",
-                      }}
-                    >
-                      Assignments
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: alpha("#000", 0.5),
-                        fontSize: isMobile ? 12 : 13,
-                        fontWeight: 500,
-                        mt: 0.25,
-                      }}
-                    >
-                      {headerText}
-                    </Typography>
+                    <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 18 : 22, color: C.text, letterSpacing: "-0.4px" }}>Assignments</Typography>
+                    <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.muted, mt: 0.2 }}>{headerText}</Typography>
                   </Box>
                 </Box>
 
-                {/* Filter Tabs - Horizontally Scrollable */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    gap: 0.8,
-                    overflowX: "auto",
-                    pb: 1,
-                    "&::-webkit-scrollbar": {
-                      height: "3px",
-                    },
-                    "&::-webkit-scrollbar-track": {
-                      background: "transparent",
-                    },
-                    "&::-webkit-scrollbar-thumb": {
-                      background: alpha(THEME_PURPLE, 0.2),
-                      borderRadius: "10px",
-                    },
-                  }}
-                >
-                  {filterOptions.map((option) => (
-                    <Button
-                      key={option.value}
-                      onClick={() => handleFilterChange(option.value)}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 0.8,
-                        px: isMobile ? 2 : 2.5,
-                        py: 0.8,
-                        borderRadius: "999px",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                        border: `2px solid transparent`,
-                        transition: "all 0.3s ease",
-                        fontSize: isMobile ? 12 : 13,
-                        fontWeight: 700,
-                        backgroundColor:
-                          filter === option.value
-                            ? alpha(THEME_PURPLE, 0.15)
-                            : "transparent",
-                        color:
-                          filter === option.value ? THEME_PURPLE : "#666",
-                        borderColor:
-                          filter === option.value
-                            ? THEME_PURPLE
-                            : "transparent",
-                        "&:hover": {
-                          backgroundColor: alpha(
-                            THEME_PURPLE,
-                            filter === option.value ? 0.2 : 0.08
-                          ),
-                        },
-                      }}
-                    >
-                      {option.icon}
-                      {option.label}
-                    </Button>
-                  ))}
+                <Box sx={{ display: "flex", gap: 0.8, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { height: 3 }, "&::-webkit-scrollbar-thumb": { background: alpha(P, 0.2), borderRadius: 10 } }}>
+                  {filterOptions.map((opt) => {
+                    const active = filter === opt.value;
+                    return (
+                      <Button key={opt.value} onClick={() => handleFilter(opt.value)}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.8, px: isMobile ? 1.8 : 2.2, py: 0.7, borderRadius: R.pill, whiteSpace: "nowrap", flexShrink: 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, fontFamily: FONT, textTransform: "none", border: `2px solid ${active ? P : "transparent"}`, backgroundColor: active ? alpha(P, 0.12) : "transparent", color: active ? P : C.muted, transition: "all 0.25s ease", "&:hover": { backgroundColor: alpha(P, active ? 0.18 : 0.06) } }}>
+                        {opt.icon}{opt.label}
+                      </Button>
+                    );
+                  })}
                 </Box>
               </Box>
 
-              {/* Content Section */}
-              <Box sx={{ mt: isMobile ? 2 : 3, display: "grid", gap: 1.2 }}>
+              {/* Content */}
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.2 }}>
                 {loading ? (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: isMobile ? 8 : 10,
-                      px: 2,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        mb: 2,
-                      }}
-                    >
-                      <CircularProgress
-                        sx={{
-                          color: THEME_PURPLE,
-                          width: isMobile ? 48 : 56,
-                          height: isMobile ? 48 : 56,
-                        }}
-                      />
-                    </Box>
-                    <Typography
-                      sx={{
-                        color: "#8a8a8a",
-                        fontSize: isMobile ? 14 : 15,
-                        fontWeight: 500,
-                      }}
-                    >
-                      Loading assignments…
-                    </Typography>
+                  <Box sx={{ textAlign: "center", py: 10 }}>
+                    <CircularProgress sx={{ color: P }} size={isMobile ? 44 : 52} />
+                    <Typography sx={{ fontFamily: FONT, color: C.muted, fontSize: isMobile ? 13 : 14, mt: 2 }}>Loading assignments…</Typography>
                   </Box>
                 ) : assignments.length === 0 ? (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: isMobile ? 8 : 10,
-                      px: 2,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: isMobile ? 64 : 80,
-                        height: isMobile ? 64 : 80,
-                        borderRadius: "16px",
-                        background: `linear-gradient(135deg, ${alpha(
-                          THEME_PURPLE,
-                          0.1
-                        )}, ${alpha(THEME_PURPLE, 0.05)})`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        margin: "0 auto 2rem",
-                      }}
-                    >
-                      <LocalShippingIcon
-                        sx={{
-                          fontSize: isMobile ? 32 : 40,
-                          color: alpha(THEME_PURPLE, 0.3),
-                        }}
-                      />
+                  <Box sx={{ textAlign: "center", py: 10 }}>
+                    <Box sx={{ width: isMobile ? 64 : 78, height: isMobile ? 64 : 78, borderRadius: "18px", background: `linear-gradient(135deg, ${alpha(P, 0.10)}, ${alpha(T, 0.06)})`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+                      <LocalShippingIcon sx={{ fontSize: isMobile ? 30 : 38, color: alpha(P, 0.30) }} />
                     </Box>
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        color: "#2d2d2d",
-                        fontSize: isMobile ? 15 : 16,
-                        mb: 0.5,
-                      }}
-                    >
-                      No assignments here
-                    </Typography>
-                    <Typography sx={{ color: "#999", fontSize: isMobile ? 13 : 14 }}>
-                      Try another filter or check back later
-                    </Typography>
+                    <Typography sx={{ fontFamily: FONT, fontWeight: 700, color: C.text, fontSize: isMobile ? 15 : 16, mb: 0.5 }}>No assignments here</Typography>
+                    <Typography sx={{ fontFamily: FONT, color: C.muted, fontSize: isMobile ? 13 : 14 }}>Try another filter or check back later</Typography>
                   </Box>
-                ) : (
-                  assignments.map((assignment) => {
-                    const isAccepted =
-                      assignment.state !== "waiting_for_approve";
-                    const firstOrder = assignment.orders?.[0];
-                    const totalAmount = assignment.orders?.reduce(
-                      (sum, o) => sum + o.amount_total,
-                      0
-                    ) || 0;
+                ) : assignments.map((asgn) => {
+                  const isAccepted = asgn.state !== "waiting_for_approve";
+                  const firstOrder = asgn.orders?.[0];
+                  const totalAmount = asgn.orders?.reduce((s, o) => s + o.amount_total, 0) || 0;
 
-                    return (
-                      <Box
-                        key={assignment.id}
-                        onClick={() =>
-                          navigate(`/driver/orders/${assignment.id}`)
-                        }
-                        sx={{
-                          borderRadius: isMobile ? "12px" : "16px",
-                          backgroundColor: "white",
-                          border: `1px solid ${alpha(THEME_PURPLE, 0.1)}`,
-                          p: isMobile ? 2 : 2.5,
-                          cursor: "pointer",
-                          transition: "all 0.2s ease",
-                          "&:active": {
-                            transform: isMobile ? "scale(0.98)" : "translateY(-2px)",
-                            boxShadow: `0 8px 24px ${alpha(THEME_PURPLE, 0.2)}`,
-                          },
-                          "&:hover": isMobile
-                            ? {}
-                            : {
-                                transform: "translateY(-2px)",
-                                boxShadow: `0 12px 36px ${alpha(
-                                  THEME_PURPLE,
-                                  0.22
-                                )}`,
-                              },
-                        }}
-                      >
-                        {/* Top Row: Title and Status */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: 1,
-                            alignItems: "flex-start",
-                            mb: 1.5,
-                          }}
-                        >
-                          <Box sx={{ flex: 1 }}>
-                            <Typography
-                              sx={{
-                                fontWeight: 900,
-                                fontSize: isMobile ? 15 : 17,
-                                color: "#2d2d2d",
-                              }}
-                            >
-                              {assignment.name}
-                            </Typography>
-                            <Typography
-                              sx={{
-                                color: alpha("#000", 0.55),
-                                fontSize: isMobile ? 11 : 12,
-                                mt: 0.25,
-                              }}
-                            >
-                              {assignment.assignment_date}
-                            </Typography>
-                          </Box>
+                  return (
+                    <Box key={asgn.id} onClick={() => navigate(`/driver/orders/${asgn.id}`)}
+                      sx={{ borderRadius: isMobile ? R.cardSm : R.card, backgroundColor: "white", border: `1px solid ${alpha(P, 0.10)}`, p: isMobile ? 2 : 2.5, cursor: "pointer", position: "relative", overflow: "hidden", transition: "all 0.2s ease", "&::before": { content: '""', position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: bannerGradient }, "&:hover": isMobile ? {} : { transform: "translateY(-2px)", boxShadow: `0 10px 30px ${alpha(P, 0.16)}` }, "&:active": { transform: "scale(0.985)" } }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: isAccepted && firstOrder ? 1.5 : 0 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 15 : 17, color: C.text }}>{asgn.name}</Typography>
+                          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, color: C.muted, mt: 0.3 }}>{asgn.assignment_date}</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Chip label={stateLabel(asgn.state)} size={isMobile ? "small" : "medium"}
+                            sx={{ backgroundColor: alpha(P, 0.10), color: P, fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 10 : 12, height: isMobile ? 24 : 28, borderRadius: R.pill }} />
+                          {!isMobile && <ChevronRightIcon sx={{ color: alpha(C.text, 0.30), fontSize: 18 }} />}
+                        </Box>
+                      </Box>
 
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                            }}
-                          >
-                            <Chip
-                              label={stateLabel(assignment.state)}
-                              size={isMobile ? "small" : "medium"}
-                              sx={{
-                                backgroundColor: alpha(THEME_PURPLE, 0.12),
-                                color: THEME_PURPLE,
-                                fontWeight: 600,
-                                fontSize: isMobile ? 11 : 12,
-                                height: isMobile ? 24 : 32,
-                              }}
-                            />
-                            {!isMobile && (
-                              <ChevronRightIcon
-                                sx={{
-                                  color: alpha("#000", 0.35),
-                                  fontSize: 20,
-                                }}
-                              />
-                            )}
+                      {isAccepted && firstOrder && (
+                        <Box sx={{ borderRadius: R.soft, backgroundColor: alpha(P, 0.03), border: `1px solid ${alpha(P, 0.10)}`, p: isMobile ? 1.2 : 1.5 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography sx={{ fontFamily: FONT, fontWeight: 700, color: C.text, fontSize: isMobile ? 13 : 14 }}>{firstOrder.customer_name}</Typography>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.3 }}>
+                                <LocationOnIcon sx={{ fontSize: isMobile ? 13 : 15, color: T, flexShrink: 0 }} />
+                                <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{firstOrder.customer_address?.area}</Typography>
+                              </Box>
+                            </Box>
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5, flexShrink: 0 }}>
+                              <Chip label={`${totalAmount.toFixed(2)} ${firstOrder.currency}`} size="small"
+                                sx={{ backgroundColor: alpha(P, 0.10), color: P, fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 11 : 12, height: isMobile ? 22 : 26, borderRadius: R.pill }} />
+                              {firstOrder.already_paid_online && (
+                                <Chip icon={<PaymentIcon sx={{ fontSize: 11, color: T }} />} label="Paid Online" size="small"
+                                  sx={{ backgroundColor: alpha(T, 0.10), color: T, fontFamily: FONT, fontWeight: 700, fontSize: 10, height: 20, borderRadius: R.pill, "& .MuiChip-icon": { ml: "4px" } }} />
+                              )}
+                            </Box>
                           </Box>
                         </Box>
+                      )}
 
-                        {/* Orders Preview */}
-                        {isAccepted && firstOrder && (
-                          <Box
-                            sx={{
-                              borderRadius: "10px",
-                              backgroundColor: alpha(THEME_PURPLE, 0.03),
-                              border: `1px solid ${alpha(THEME_PURPLE, 0.12)}`,
-                              p: isMobile ? 1.2 : 1.5,
-                              mb: 1,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
-                                gap: 1,
-                              }}
-                            >
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography
-                                  sx={{
-                                    fontWeight: 700,
-                                    color: "#2d2d2d",
-                                    fontSize: isMobile ? 13 : 14,
-                                  }}
-                                >
-                                  {firstOrder.customer_name}
-                                </Typography>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                    mt: 0.25,
-                                  }}
-                                >
-                                  <LocationOnIcon
-                                    sx={{
-                                      fontSize: isMobile ? 14 : 16,
-                                      color: THEME_PURPLE,
-                                      flexShrink: 0,
-                                    }}
-                                  />
-                                  <Typography
-                                    sx={{
-                                      color: alpha("#000", 0.55),
-                                      fontSize: isMobile ? 11 : 12,
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {firstOrder.customer_address?.area}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                              <Chip
-                                label={`${totalAmount.toFixed(2)} ${
-                                  firstOrder.currency
-                                }`}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(THEME_PURPLE, 0.12),
-                                  color: THEME_PURPLE,
-                                  fontWeight: 600,
-                                  fontSize: isMobile ? 11 : 12,
-                                  height: isMobile ? 24 : 28,
-                                  flexShrink: 0,
-                                }}
-                              />
-                            </Box>
+                      {!isAccepted && (
+                        <Box sx={{ pt: 1.2, borderTop: `1px solid ${alpha(P, 0.08)}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Box>
+                            <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.muted, fontWeight: 600 }}>Orders: {asgn.orders_count}</Typography>
+                            <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 13 : 14, color: C.text, mt: 0.3 }}>
+                              {totalAmount.toFixed(2)} {firstOrder?.currency || ""}
+                            </Typography>
                           </Box>
-                        )}
-
-                        {/* Pending Summary */}
-                        {!isAccepted && (
-                          <Box
-                            sx={{
-                              pt: 1,
-                              borderTop: `1px solid ${alpha(
-                                THEME_PURPLE,
-                                0.12
-                              )}`,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                              }}
-                            >
-                              <Box>
-                                <Typography
-                                  sx={{
-                                    color: alpha("#000", 0.55),
-                                    fontSize: isMobile ? 12 : 13,
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Orders: {assignment.orders_count}
-                                </Typography>
-                                <Typography
-                                  sx={{
-                                    color: "#2d2d2d",
-                                    fontWeight: 700,
-                                    fontSize: isMobile ? 13 : 14,
-                                    mt: 0.3,
-                                  }}
-                                >
-                                  {totalAmount.toFixed(2)}{" "}
-                                  {firstOrder?.currency || ""}
-                                </Typography>
-                              </Box>
-                              <Box
-                                sx={{
-                                  px: 2,
-                                  py: 0.8,
-                                  borderRadius: "8px",
-                                  backgroundColor: alpha(THEME_PURPLE, 0.08),
-                                }}
-                              >
-                                <Typography
-                                  sx={{
-                                    color: THEME_PURPLE,
-                                    fontSize: isMobile ? 11 : 12,
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  Review →
-                                </Typography>
-                              </Box>
-                            </Box>
+                          <Box sx={{ px: 1.8, py: 0.7, borderRadius: R.soft, backgroundColor: alpha(T, 0.10) }}>
+                            <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, fontWeight: 700, color: T }}>Review →</Typography>
                           </Box>
-                        )}
-                      </Box>
-                    );
-                  })
-                )}
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
               </Box>
             </Box>
           </Fade>
         </Container>
       </Box>
 
-      {/* Floating Refresh Button for Mobile */}
       {isMobile && !loading && (
-        <Button
-          onClick={() => load(true)}
-          disabled={refreshing}
-          sx={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            backgroundColor: THEME_PURPLE,
-            color: "white",
-            boxShadow: `0 8px 24px ${alpha(THEME_PURPLE, 0.3)}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            animation: refreshing ? "spin 1s linear infinite" : "none",
-            "@keyframes spin": {
-              "0%": { transform: "rotate(0deg)" },
-              "100%": { transform: "rotate(360deg)" },
-            },
-            "&:hover": {
-              backgroundColor: "#7c3bd7",
-            },
-            "&:disabled": {
-              backgroundColor: alpha(THEME_PURPLE, 0.5),
-            },
-            zIndex: 50,
-          }}
-        >
-          <RefreshIcon sx={{ fontSize: 24 }} />
+        <Button onClick={() => load(true)} disabled={refreshing}
+          sx={{ position: "fixed", bottom: 24, right: 24, width: 54, height: 54, borderRadius: "50%", minWidth: 0, backgroundColor: P, color: "white", boxShadow: `0 6px 20px ${alpha(P, 0.32)}`, animation: refreshing ? "spin 1s linear infinite" : "none", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } }, "&:hover": { backgroundColor: C.purpleDark }, "&:disabled": { backgroundColor: alpha(P, 0.45) }, zIndex: 50 }}>
+          <RefreshIcon sx={{ fontSize: 22 }} />
         </Button>
       )}
     </Box>
