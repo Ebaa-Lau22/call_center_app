@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   Box, Container, Fade, Typography, Button, alpha, Divider,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Chip, CircularProgress, useMediaQuery, useTheme,
+  Chip, useMediaQuery, useTheme,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -12,52 +12,124 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import StoreIcon from "@mui/icons-material/Store";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import AssignmentReturnIcon from "@mui/icons-material/AssignmentReturn";
 import NotesIcon from "@mui/icons-material/Notes";
-import PaymentIcon from "@mui/icons-material/Payment";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import VerifiedIcon from "@mui/icons-material/Verified";
+import PersonIcon from "@mui/icons-material/Person";
 import axios from "axios";
-import { C, FONT, R, bannerGradient } from "../theme/ccTheme";
+import { C, FONT, R, bannerGradient, AppLoader } from "../theme/ccTheme";
 
 const P = C.purple;
 const T = C.teal;
+const f = { fontFamily: FONT };
+
+const RETURNED_METHOD = { id: "returned", name: "Returned", is_online: false };
+
+const DONE_STATES = ["received", "partially_received", "rejected_by_client", "done"];
 
 function stateLabel(s) {
-  if (s === "waiting_for_approve") return "Pending Approval";
-  if (s === "delivery") return "In Delivery";
-  if (s === "partially_received") return "Partially Received";
-  if (s === "received") return "Money Received";
-  if (s === "done") return "Done";
-  return s;
+  const map = {
+    waiting_for_approve: "Pending Approval",
+    delivery: "In Delivery",
+    partially_received: "Partially Received",
+    received: "Received",
+    rejected_by_client: "Returned",
+    done: "Done",
+  };
+  return map[s] || s;
 }
 
-const RETURNED_METHOD = { id: "returned", name: "Returned" };
+function SLabel({ children }) {
+  return (
+    <Typography sx={{ ...f, fontSize: 10, letterSpacing: "0.8px", textTransform: "uppercase", color: C.muted, mb: 0.8 }}>
+      {children}
+    </Typography>
+  );
+}
+
+function Row2({ label, value, color, strong }) {
+  return (
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", py: 0.3 }}>
+      <Typography sx={{ ...f, fontSize: 13, color: C.muted }}>{label}</Typography>
+      <Typography sx={{ ...f, fontSize: 13, color: color || C.text, fontWeight: strong ? 500 : 400 }}>{value}</Typography>
+    </Box>
+  );
+}
+
+/* Card without top banner — generic use */
+function Card({ children, sx = {} }) {
+  return (
+    <Box sx={{
+      backgroundColor: "white",
+      borderRadius: R.cardSm,
+      border: "1px solid rgba(126,87,194,0.08)",
+      boxShadow: "0 2px 8px rgba(126,87,194,0.06)",
+      p: 2,
+      mb: 1.5,
+      ...sx,
+    }}>
+      {children}
+    </Box>
+  );
+}
+
+/* Card WITH the gradient top banner — used for the hero header card */
+function HeroCard({ children, sx = {} }) {
+  return (
+    <Box sx={{
+      backgroundColor: "white",
+      borderRadius: R.cardSm,
+      border: "1px solid rgba(126,87,194,0.08)",
+      boxShadow: "0 2px 8px rgba(126,87,194,0.06)",
+      position: "relative",
+      overflow: "hidden",
+      mb: 1.5,
+      "&::before": {
+        content: '""',
+        position: "absolute",
+        top: 0, left: 0, right: 0,
+        height: "4px",
+        background: bannerGradient,
+      },
+      ...sx,
+    }}>
+      {/* push content below the strip */}
+      <Box sx={{ pt: 2, px: 2, pb: 2 }}>
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+function MiniStat({ label, value, color }) {
+  return (
+    <Box>
+      <Typography sx={{ ...f, fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</Typography>
+      <Typography sx={{ ...f, fontSize: 13, color: color || C.text, mt: 0.2 }}>{value}</Typography>
+    </Box>
+  );
+}
 
 export default function DriverAssignmentDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(false);
-
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentAmounts, setPaymentAmounts] = useState({});
   const [paymentEnabled, setPaymentEnabled] = useState({});
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentNote, setPaymentNote] = useState("");
-
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState("");
-  const [confirmCallback, setConfirmCallback] = useState(null);
+  const [returnDialog, setReturnDialog] = useState(false);
 
   const driverId = JSON.parse(localStorage.getItem("user_data"))?.id;
   const userData = JSON.parse(localStorage.getItem("user_data") || "null");
+
   if (!userData?.isDriver) {
     return (
       <Box sx={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -69,33 +141,31 @@ export default function DriverAssignmentDetails() {
   const load = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(
-        `/api/driver/task/details`,
+      const res = await axios.post(
+        "/api/driver/task/details",
         { params: { assignment_id: id, driver_id: driverId } },
         { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
-      if (response.data.result?.status === "success") {
-        setAssignment(response.data.result?.result);
-      }
-    } catch (error) {
-      console.error("Error loading assignment:", error);
-    }
+      if (res.data.result?.status === "success") setAssignment(res.data.result.result);
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [id, driverId]);
 
-  const canAct    = useMemo(() => assignment?.state === "waiting_for_approve", [assignment]);
-  const canCall   = useMemo(() => assignment?.state === "delivery", [assignment]);
-  const canReceive = useMemo(() =>
-    assignment && (assignment.state === "delivery" || assignment.state === "partially_received"),
-    [assignment]
-  );
+  const order = assignment?.orders?.[0];
+  const paidOnline = !!order?.already_paid_online;
+  const hasDiscount = (order?.amount_discount || 0) > 0;
+
+  const canAct = assignment?.state === "waiting_for_approve";
+  const canCall = assignment?.state === "delivery";
+  const canReceive = assignment?.state === "delivery";
+
+  // ── actions ───────────────────────────────────────────────────────────────
 
   const handleAccept = async () => {
     try {
-      const res = await axios.post(
-        `/api/driver/task/accept`,
+      const res = await axios.post("/api/driver/task/accept",
         { params: { assignment_id: id, driver_id: driverId } },
         { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
@@ -106,8 +176,7 @@ export default function DriverAssignmentDetails() {
 
   const handleReject = async () => {
     try {
-      const res = await axios.post(
-        `/api/driver/task/refuse`,
+      const res = await axios.post("/api/driver/task/refuse",
         { params: { assignment_id: id, driver_id: driverId, reason: "" } },
         { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
@@ -121,339 +190,318 @@ export default function DriverAssignmentDetails() {
   const openReceiveMoney = async () => {
     setLoadingPayment(true);
     try {
-      const res = await axios.post(
-        `/api/driver/payment/types`,
-        { params: {} },
+      const res = await axios.post("/api/driver/payment/types", { params: {} },
         { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
       if (res.data.result?.status === "success") {
-        const methods = res.data.result?.payment_types || [];
+        const methods = res.data.result.payment_types || [];
         setPaymentMethods(methods);
         const allM = [...methods, RETURNED_METHOD];
-        setPaymentEnabled(allM.reduce((acc, m) => ({ ...acc, [m.id]: false }), {}));
-        setPaymentAmounts(allM.reduce((acc, m) => ({ ...acc, [m.id]: 0 }), {}));
+        const enabled = allM.reduce((a, m) => ({ ...a, [m.id]: false }), {});
+        const amounts = allM.reduce((a, m) => ({ ...a, [m.id]: "" }), {});
+
+        if (paidOnline) {
+          const onlineM = methods.find((m) => m.is_online);
+          if (onlineM) {
+            enabled[onlineM.id] = true;
+            amounts[onlineM.id] = String(order?.amount_total || 0);
+          }
+        }
+
+        setPaymentEnabled(enabled);
+        setPaymentAmounts(amounts);
         setPaymentNote("");
         setPayDialogOpen(true);
-      } else {
-        alert("Error loading payment methods");
-      }
+      } else { alert("Error loading payment methods"); }
     } catch { alert("Error loading payment methods"); }
     setLoadingPayment(false);
   };
 
-  const openReturnOrder = () => {
-    const order = assignment?.orders?.[0];
-    if (!order) return;
-    setConfirmMessage(
-      `This will mark the entire order as returned.\n\nOrder Total: ${order.amount_total} ${order.currency}\n\nNo money will be recorded. Are you sure?`
-    );
-    setConfirmCallback(() => async () => {
-      setConfirmDialogOpen(false);
-      setLoadingPayment(true);
-      try {
-        const res = await axios.post(
-          `/api/driver/receive/money`,
-          {
-            params: {
-              assignment_id: id,
-              driver_id: driverId,
-              payment_type_ids: [],
-              description: "Full order returned by driver",
-            },
-          },
-          { withCredentials: true, headers: { "Content-Type": "application/json" } }
-        );
-        if (res.data.result?.status === "success") {
-          alert("Order marked as returned successfully.");
-          navigate("/driver/orders");
-        } else {
-          alert(res.data.result?.message || "Failed to record return");
-        }
-      } catch { alert("Error recording return"); }
-      setLoadingPayment(false);
+  const callReturnOrderAPI = async (description = "Order returned by driver") => {
+    setLoadingPayment(true);
+    try {
+      const res = await axios.post("/api/driver/return_order",
+        { params: { assignment_id: id, driver_id: driverId, description } },
+        { withCredentials: true, headers: { "Content-Type": "application/json" } }
+      );
+      if (res.data.result?.status === "success") {
+        alert("Order marked as returned.");
+        navigate("/driver/orders");
+      } else {
+        alert(res.data.result?.message || "Failed");
+      }
+    } catch { alert("Error returning order"); }
+    setLoadingPayment(false);
+  };
+
+  const confirmReturnOrder = () => {
+    setReturnDialog(false);
+    callReturnOrderAPI("Order fully returned by driver");
+  };
+
+  const toggleMethod = (mid) => {
+    setPaymentEnabled((prev) => {
+      const next = { ...prev, [mid]: !prev[mid] };
+      if (!next[mid]) setPaymentAmounts((a) => ({ ...a, [mid]: "" }));
+      return next;
     });
-    setConfirmDialogOpen(true);
-  };
-
-  const togglePaymentMethod = (methodId) => {
-    setPaymentEnabled((prev) => ({ ...prev, [methodId]: !prev[methodId] }));
-    if (paymentEnabled[methodId]) {
-      setPaymentAmounts((prev) => ({ ...prev, [methodId]: 0 }));
-    }
-  };
-
-  const handleAmountChange = (methodId, value) => {
-    setPaymentAmounts((prev) => ({ ...prev, [methodId]: parseFloat(value) || 0 }));
   };
 
   const totalEntered = useMemo(() =>
-    allMethods.reduce((sum, m) => sum + (paymentEnabled[m.id] ? paymentAmounts[m.id] || 0 : 0), 0),
+    allMethods.reduce((s, m) => s + (paymentEnabled[m.id] ? parseFloat(paymentAmounts[m.id]) || 0 : 0), 0),
     [allMethods, paymentEnabled, paymentAmounts]
   );
 
-  const confirmReceiveMoney = async () => {
-    const order = assignment?.orders?.[0];
-    const orderTotal = order?.amount_total || 0;
-    const diff = Math.abs(totalEntered - orderTotal);
+  const returnedAmount = useMemo(() =>
+    paymentEnabled["returned"] ? parseFloat(paymentAmounts["returned"]) || 0 : 0,
+    [paymentEnabled, paymentAmounts]
+  );
 
-    if (diff > 0.01) {
-      alert(
-        `Total entered (${totalEntered.toFixed(2)}) must equal the order total (${orderTotal.toFixed(2)}).\n\nUse the "Returned" method for any amount not collected in cash.`
-      );
+  const submitPayment = async () => {
+    const orderTotal = order?.amount_total || 0;
+    const amountDiff = totalEntered - orderTotal;
+    if (Math.abs(amountDiff) > 0.01) {
+      alert(`Total entered (${totalEntered.toFixed(2)}) must equal the order total (${orderTotal.toFixed(2)}).\n\nUse "Returned" for any unrecovered amount.`);
+      return;
+    }
+
+    if (Math.abs(returnedAmount - orderTotal) < 0.01) {
+      setPayDialogOpen(false);
+      await callReturnOrderAPI("Full order returned — entered via receive money dialog");
       return;
     }
 
     const realPayments = allMethods
-      .filter((m) => m.id !== "returned" && paymentEnabled[m.id] && paymentAmounts[m.id] > 0)
-      .map((m) => ({ payment_type_id: m.id, amount: paymentAmounts[m.id] }));
+      .filter((m) => m.id !== "returned" && paymentEnabled[m.id] && (parseFloat(paymentAmounts[m.id]) || 0) > 0)
+      .map((m) => ({ payment_type_id: m.id, amount: parseFloat(paymentAmounts[m.id]) }));
 
     setLoadingPayment(true);
     setPayDialogOpen(false);
     try {
-      const res = await axios.post(
-        `/api/driver/receive/money`,
-        {
-          params: {
-            assignment_id: id,
-            driver_id: driverId,
-            payment_type_ids: realPayments,
-            description: paymentNote,
-          },
-        },
+      const res = await axios.post("/api/driver/receive/money",
+        { params: { assignment_id: id, driver_id: driverId, payment_type_ids: realPayments, description: paymentNote } },
         { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
-      if (res.data.result?.status === "success") {
-        alert("Payment recorded successfully!");
-        navigate("/driver/orders");
-      } else {
-        alert(res.data.result?.message || "Failed to record payment");
-        setPayDialogOpen(true);
-      }
+      if (res.data.result?.status === "success") { alert("Payment recorded!"); navigate("/driver/orders"); }
+      else { alert(res.data.result?.message || "Failed"); setPayDialogOpen(true); }
     } catch { alert("Error recording payment"); setPayDialogOpen(true); }
     setLoadingPayment(false);
   };
 
-  const copyPhone = async (phone) => {
-    try { await navigator.clipboard.writeText(phone); alert("Phone copied!"); }
-    catch { }
-  };
+  // ── loading / not found ───────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <Box sx={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: `linear-gradient(135deg, ${alpha(P, 0.06)} 0%, white 100%)` }}>
-        <CircularProgress sx={{ color: P }} />
-      </Box>
-    );
-  }
+  if (loading) return <AppLoader />;
 
   if (!assignment) {
     return (
-      <Box sx={{ minHeight: "100vh", background: `linear-gradient(135deg, ${alpha(P, 0.06)} 0%, white 100%)` }}>
-        <Container maxWidth="md" sx={{ pt: 4 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/driver/orders")} sx={{ color: P, fontFamily: FONT, fontWeight: 600, mb: 3 }}>Back</Button>
-          <Typography sx={{ color: C.muted, fontFamily: FONT }}>Assignment not found</Typography>
+      <Box sx={{ minHeight: "100vh", backgroundColor: C.purpleBg, pt: 4 }}>
+        <Container maxWidth="md" sx={{ px: { xs: 1.5, sm: 2 } }}>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/driver/orders")} sx={{ ...f, color: P, mb: 3, textTransform: "none" }}>Back</Button>
+          <Typography sx={{ ...f, color: C.muted }}>Assignment not found</Typography>
         </Container>
       </Box>
     );
   }
 
-  const order = assignment.orders?.[0];
-  const hasDiscount = order && order.amount_discount > 0;
+  const amountDiff = totalEntered - (order?.amount_total || 0);
+  const amountOk = Math.abs(amountDiff) < 0.01;
 
   return (
-    <Box sx={{ minHeight: "100vh", background: `linear-gradient(135deg, ${alpha(P, 0.04)} 0%, white 60%, ${alpha(T, 0.03)} 100%)`, fontFamily: FONT, pb: 4 }}>
-      <Container maxWidth="md" sx={{ pt: isMobile ? 2 : 3, px: isMobile ? 1.5 : 2 }}>
-        <Fade in timeout={400}>
+    <Box sx={{ minHeight: "100vh", backgroundColor: C.purpleBg, fontFamily: FONT, pb: 5 }}>
+      {/* Container: no side padding on mobile so cards are edge-to-edge */}
+      <Container maxWidth="md" sx={{ pt: isMobile ? 0 : 3, px: { xs: 1.5, sm: 2 } }}>
+        <Fade in timeout={350}>
           <Box>
-            <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/driver/orders")}
-              sx={{ color: P, fontFamily: FONT, fontWeight: 600, mb: 2, fontSize: isMobile ? 13 : 14, "&:hover": { backgroundColor: alpha(P, 0.06) } }}>
-              Back
-            </Button>
 
-            {/* Assignment header card */}
-            <Box sx={cardSx(isMobile)}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: canAct ? 2.5 : 0 }}>
-                <Box>
-                  <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 18 : 22, color: C.text }}>{assignment.name}</Typography>
-                  <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, color: C.muted, mt: 0.4 }}>{assignment.assignment_date}</Typography>
+            {/* back button — needs its own horizontal padding on mobile */}
+            <Box sx={{ pt: { xs: 2, sm: 0 }, mb: 1 }}>
+              <Button
+                startIcon={<ArrowBackIcon />}
+                onClick={() => navigate("/driver/orders")}
+                sx={{ ...f, color: P, fontSize: 13, textTransform: "none", "&:hover": { backgroundColor: alpha(P, 0.06) } }}
+              >
+                Back
+              </Button>
+            </Box>
+
+            {/* ── header hero card with gradient banner ── */}
+            <HeroCard>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ ...f, fontSize: isMobile ? 17 : 19, color: C.text }}>{assignment.name}</Typography>
+                  <Typography sx={{ ...f, fontSize: 12, color: C.muted, mt: 0.3 }}>{assignment.assignment_date}</Typography>
+
+                  {/* note — only when non-empty, purple theme, divider style */}
+                  {assignment.note?.trim() && (
+                    <Box sx={{ mt: 2 }}>
+                      <Box sx={{ width: "50%", borderTop: `1px solid ${alpha(C.muted, 0.30)}`, mb: 1.2 }} />
+                      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.7 }}>
+                        <NotesIcon sx={{ color: P, fontSize: 15, mt: "2px", flexShrink: 0 }} />
+                        <Box>
+                          <Typography sx={{ ...f, fontSize: 11, color: P, letterSpacing: "0.3px", mb: 0.4 }}>
+                            Driver Notes
+                          </Typography>
+                          <Typography sx={{ ...f, fontSize: 13, color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                            {assignment.note}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
-                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.8, flexShrink: 0 }}>
-                  <Chip label={stateLabel(assignment.state)}
-                    sx={{ backgroundColor: alpha(P, 0.12), color: P, fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 11 : 12, height: isMobile ? 26 : 30, borderRadius: R.pill }} />
-                  {order?.already_paid_online && (
-                    <Chip icon={<PaymentIcon sx={{ fontSize: 14, color: T }} />} label="Paid Online"
-                      sx={{ backgroundColor: alpha(T, 0.12), color: T, fontFamily: FONT, fontWeight: 700, fontSize: 11, height: 24, borderRadius: R.pill, "& .MuiChip-icon": { ml: "6px" } }} />
+
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.6, flexShrink: 0 }}>
+                  <Chip
+                    label={stateLabel(assignment.state)}
+                    sx={{ ...f, backgroundColor: alpha(P, 0.09), color: P, fontSize: 11, height: 24, borderRadius: R.pill }}
+                  />
+                  {paidOnline && (
+                    <Chip
+                      icon={<VerifiedIcon sx={{ fontSize: 12, color: T }} />}
+                      label="Paid Online"
+                      sx={{ ...f, backgroundColor: alpha(T, 0.10), color: T, fontSize: 11, height: 24, borderRadius: R.pill, "& .MuiChip-icon": { ml: "6px" } }}
+                    />
                   )}
                 </Box>
               </Box>
 
               {canAct && (
-                <Box sx={{ display: "flex", gap: 1.5 }}>
+                <Box sx={{ display: "flex", gap: 1.2, mt: 2 }}>
                   <Button startIcon={<CheckCircleIcon />} onClick={handleAccept} fullWidth
-                    sx={{ backgroundColor: P, color: "white", borderRadius: R.cardSm, py: isMobile ? 1 : 1.2, fontWeight: 700, fontSize: isMobile ? 13 : 14, fontFamily: FONT, textTransform: "none", boxShadow: `0 6px 18px ${alpha(P, 0.30)}`, "&:hover": { backgroundColor: C.purpleDark } }}>
+                    sx={{ ...f, backgroundColor: P, color: "white", borderRadius: R.soft, py: 1.1, fontSize: 14, textTransform: "none", boxShadow: `0 4px 12px ${alpha(P, 0.22)}`, "&:hover": { backgroundColor: C.purpleDark } }}>
                     Accept
                   </Button>
                   <Button startIcon={<CancelIcon />} onClick={handleReject} fullWidth
-                    sx={{ border: `2px solid ${C.red}`, color: C.red, borderRadius: R.cardSm, py: isMobile ? 1 : 1.2, fontWeight: 700, fontSize: isMobile ? 13 : 14, fontFamily: FONT, textTransform: "none", "&:hover": { backgroundColor: alpha(C.red, 0.06) } }}>
+                    sx={{ ...f, border: `1.5px solid ${C.red}`, color: C.red, borderRadius: R.soft, py: 1.1, fontSize: 14, textTransform: "none", "&:hover": { backgroundColor: alpha(C.red, 0.05) } }}>
                     Reject
                   </Button>
                 </Box>
               )}
-            </Box>
-
-            {/* Assignment note */}
-            {assignment.note && (
-              <Box sx={{ ...cardSx(isMobile), backgroundColor: alpha(T, 0.04), border: `1px solid ${alpha(T, 0.20)}` }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
-                  <NotesIcon sx={{ color: T, fontSize: 18 }} />
-                  <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 13 : 14, color: C.text }}>Delivery Note</Typography>
-                </Box>
-                <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 13 : 14, color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{assignment.note}</Typography>
-              </Box>
-            )}
+            </HeroCard>
 
             {order && (
               <>
-                {/* Order info */}
-                <Box sx={cardSx(isMobile)}>
-                  <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 15 : 16, color: C.text, mb: 1.5 }}>Order Details</Typography>
-
-                  <Box sx={{ borderRadius: R.soft, border: `1px solid ${alpha(P, 0.14)}`, backgroundColor: alpha(P, 0.03), p: isMobile ? 1.5 : 2, mb: 1.5 }}>
-                    <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 14 : 15, color: C.text }}>{order.name}</Typography>
-                    <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.muted, mt: 0.3 }}>Customer: {order.customer_name}</Typography>
-
-                    <Divider sx={{ my: 1.5, borderColor: alpha(P, 0.10) }} />
-
-                    <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", mb: 1 }}>
-                      <LocationOnIcon sx={{ color: P, fontSize: 18, flexShrink: 0, mt: 0.2 }} />
+                {/* paid online notice */}
+                {paidOnline && (
+                  <Card sx={{ border: `1.5px solid ${alpha(T, 0.28)}`, backgroundColor: alpha(T, 0.04) }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <VerifiedIcon sx={{ color: T, fontSize: 24, flexShrink: 0 }} />
                       <Box>
-                        <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: isMobile ? 12 : 13, color: C.text }}>Delivery Location</Typography>
-                        {order.customer_address?.street && <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, color: C.muted, mt: 0.2 }}>{order.customer_address.street}</Typography>}
-                        {order.customer_address?.street2 && <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, color: C.muted }}>{order.customer_address.street2}</Typography>}
-                        <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 11 : 12, color: P, mt: 0.2 }}>Area: {order.customer_address?.area}</Typography>
+                        <Typography sx={{ ...f, fontSize: 14, color: T }}>Already Paid Online</Typography>
+                        <Typography sx={{ ...f, fontSize: 12, color: C.mutedDark, mt: 0.2, lineHeight: 1.5 }}>
+                          Do not ask the customer for cash. Payment was collected digitally.
+                        </Typography>
                       </Box>
                     </Box>
+                  </Card>
+                )}
 
-                    {order.branch_address && (
-                      <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                        <StoreIcon sx={{ color: T, fontSize: 18, flexShrink: 0, mt: 0.2 }} />
-                        <Box>
-                          <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: isMobile ? 12 : 13, color: C.text }}>Pickup Location</Typography>
-                          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 11 : 12, color: C.muted, mt: 0.2 }}>{order.branch_address}</Typography>
-                        </Box>
-                      </Box>
-                    )}
+                {/* order summary — no total (lives in products card) */}
+                <Card>
+                  <SLabel>Order</SLabel>
+                  <Typography sx={{ ...f, fontSize: 15, color: C.text }}>{order.name}</Typography>
+                  <Typography sx={{ ...f, fontSize: 13, color: C.muted, mt: 0.3, mb: 1.5 }}>{order.customer_name}</Typography>
 
-                    <Divider sx={{ my: 1.5, borderColor: alpha(P, 0.10) }} />
-
-                    {/* Amount totals */}
-                    {hasDiscount && (
-                      <>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.muted }}>Before Discount</Typography>
-                          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.mutedDark, fontWeight: 600 }}>
-                            {order.amount_before_discount?.toFixed(2)} {order.currency}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.gold }}>Discount</Typography>
-                          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.gold, fontWeight: 600 }}>
-                            −{order.amount_discount?.toFixed(2)} {order.currency}
-                          </Typography>
-                        </Box>
-                        <Divider sx={{ my: 1, borderColor: alpha(P, 0.08) }} />
-                      </>
-                    )}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 13 : 14, color: C.muted, fontWeight: 600 }}>Order Total</Typography>
-                      <Chip label={`${order.amount_total} ${order.currency}`}
-                        sx={{ backgroundColor: alpha(P, 0.12), color: P, fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 13 : 14, height: 32, borderRadius: R.pill }} />
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", mb: order.branch_address ? 1.2 : 0 }}>
+                    <LocationOnIcon sx={{ color: P, fontSize: 16, flexShrink: 0, mt: "2px" }} />
+                    <Box>
+                      <Typography sx={{ ...f, fontSize: 13, color: C.text }}>{order.customer_address?.area}</Typography>
+                      {order.customer_address?.street && (
+                        <Typography sx={{ ...f, fontSize: 12, color: C.muted, mt: 0.15 }}>{order.customer_address.street}</Typography>
+                      )}
+                      {order.customer_address?.street2 && (
+                        <Typography sx={{ ...f, fontSize: 12, color: C.muted }}>{order.customer_address.street2}</Typography>
+                      )}
                     </Box>
                   </Box>
-                </Box>
 
-                {/* Order lines */}
-                {order.order_lines && order.order_lines.length > 0 && (
-                  <Box sx={cardSx(isMobile)}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                      <ShoppingCartIcon sx={{ color: P, fontSize: 20 }} />
-                      <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 15 : 16, color: C.text }}>
-                        Products ({order.order_lines.length})
-                      </Typography>
+                  {order.branch_address && (
+                    <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                      <StoreIcon sx={{ color: T, fontSize: 16, flexShrink: 0, mt: "2px" }} />
+                      <Typography sx={{ ...f, fontSize: 13, color: C.mutedDark }}>{order.branch_address}</Typography>
                     </Box>
+                  )}
+                </Card>
 
+                {/* order lines with totals */}
+                {order.order_lines?.length > 0 && (
+                  <Card>
+                    <SLabel>Products ({order.order_lines.length})</SLabel>
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                       {order.order_lines.map((line, idx) => (
-                        <Box key={line.id || idx} sx={{ borderRadius: R.soft, border: `1px solid ${alpha(P, 0.12)}`, backgroundColor: alpha(P, 0.02), p: isMobile ? 1.2 : 1.5 }}>
-                          <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 13 : 14, color: C.text, mb: 0.8 }}>{line.product_name}</Typography>
-                          <Box sx={{ display: "flex", flexWrap: "wrap", gap: { xs: 1.5, sm: 3 } }}>
-                            <LineDetail label="Qty" value={line.quantity} />
-                            <LineDetail label="Unit Price" value={`${line.price_unit?.toFixed(2)} ${order.currency}`} />
-                            {line.discount > 0 && <LineDetail label="Discount" value={`${line.discount}%`} highlight={C.gold} />}
-                            {line.discount > 0 && <LineDetail label="Disc. Amount" value={`−${line.discount_amount?.toFixed(2)} ${order.currency}`} highlight={C.gold} />}
-                            <LineDetail label="Subtotal" value={`${line.subtotal?.toFixed(2)} ${order.currency}`} highlight={P} bold />
+                        <Box key={line.id || idx} sx={{ borderRadius: R.soft, border: "1px solid #f0eef5", p: 1.5 }}>
+                          <Typography sx={{ ...f, fontSize: 13, color: C.text, mb: 1 }}>{line.product_name}</Typography>
+                          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                            <MiniStat label="Qty" value={line.quantity} />
+                            <MiniStat label="Unit price" value={`${Number(line.price_unit).toFixed(2)} ${order.currency}`} />
+                            {line.discount > 0 && <MiniStat label="Discount" value={`${line.discount}%`} color={C.gold} />}
+                            {line.discount > 0 && <MiniStat label="Disc. amt" value={`−${Number(line.discount_amount).toFixed(2)}`} color={C.gold} />}
+                            <MiniStat label="Subtotal" value={`${Number(line.subtotal).toFixed(2)} ${order.currency}`} color={P} />
                           </Box>
                         </Box>
                       ))}
                     </Box>
 
-                    {/* Lines total section */}
-                    <Box sx={{ mt: 2, pt: 2, borderTop: `1.5px solid ${alpha(P, 0.12)}` }}>
-                      {hasDiscount && (
-                        <>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                            <Typography sx={{ fontFamily: FONT, fontSize: 13, color: C.muted }}>Subtotal before discounts</Typography>
-                            <Typography sx={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: C.mutedDark }}>{order.amount_before_discount?.toFixed(2)} {order.currency}</Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                            <Typography sx={{ fontFamily: FONT, fontSize: 13, color: C.gold }}>Total discounts</Typography>
-                            <Typography sx={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.gold }}>−{order.amount_discount?.toFixed(2)} {order.currency}</Typography>
-                          </Box>
-                          <Divider sx={{ mb: 1, borderColor: alpha(P, 0.10) }} />
-                        </>
-                      )}
-                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                        <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 14 : 15, fontWeight: 700, color: C.text }}>Total</Typography>
-                        <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 15 : 16, fontWeight: 800, color: P }}>{order.amount_total?.toFixed(2)} {order.currency}</Typography>
-                      </Box>
-                    </Box>
-                  </Box>
+                    <Divider sx={{ my: 1.5, borderColor: "#f0eef5" }} />
+                    {hasDiscount && (
+                      <>
+                        <Row2 label="Subtotal before discounts" value={`${Number(order.amount_before_discount).toFixed(2)} ${order.currency}`} />
+                        <Row2 label="Total discounts" value={`−${Number(order.amount_discount).toFixed(2)} ${order.currency}`} color={C.gold} />
+                        <Divider sx={{ my: 1, borderColor: "#f0eef5" }} />
+                      </>
+                    )}
+                    <Row2 label="Total" value={`${Number(order.amount_total).toFixed(2)} ${order.currency}`} color={P} strong />
+                  </Card>
                 )}
 
-                {/* Customer info + contact actions */}
-                <Box sx={cardSx(isMobile)}>
-                  <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 15 : 16, color: C.text, mb: 1.5 }}>Customer Information</Typography>
-                  <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: isMobile ? 14 : 15, color: C.text, mb: 1 }}>{order.customer_name}</Typography>
-                  <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap", mb: canCall ? 2 : 0 }}>
-                    <Chip icon={<PhoneIcon />} label={order.customer_phone}
-                      sx={{ backgroundColor: alpha(P, 0.10), color: P, fontWeight: 600, fontSize: isMobile ? 11 : 12, "& .MuiChip-icon": { color: P }, fontFamily: FONT }} />
-                    <Chip icon={<LocationOnIcon />} label={order.customer_address?.area}
-                      sx={{ backgroundColor: alpha(P, 0.10), color: P, fontWeight: 600, fontSize: isMobile ? 11 : 12, "& .MuiChip-icon": { color: P }, fontFamily: FONT }} />
+                {/* customer — textured with purple icon row */}
+                <Card sx={{ backgroundImage: `radial-gradient(circle at 100% 0%, ${alpha(P, 0.03)} 0%, transparent 60%)` }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
+                    <PersonIcon sx={{ color: P, fontSize: 18 }} />
+                    <SLabel>Customer</SLabel>
                   </Box>
+                  <Typography sx={{ ...f, fontSize: 14, color: C.text }}>{order.customer_name}</Typography>
 
-                  {canCall && order.customer_phone && (
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                      <Button startIcon={<ContentCopyIcon />} onClick={() => copyPhone(order.customer_phone)}
-                        sx={outlineBtn(P, isMobile)}>Copy Phone</Button>
-                      <Button startIcon={<PhoneIcon />} component="a" href={`tel:${order.customer_phone}`}
-                        sx={outlineBtn(P, isMobile)}>Call</Button>
-                      <Button startIcon={<WhatsAppIcon />} component="a" href={`https://wa.me/${order.customer_phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
-                        sx={outlineBtn("#25D366", isMobile)}>WhatsApp</Button>
+                  {order.customer_phone && (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mt: 0.6, mb: canCall ? 1.5 : 0 }}>
+                      <PhoneIcon sx={{ color: P, fontSize: 15, flexShrink: 0 }} />
+                      <Typography sx={{ ...f, fontSize: 13, color: C.mutedDark }}>{order.customer_phone}</Typography>
+                      {order.customer_address?.area && (
+                        <>
+                          <Box sx={{ width: 3, height: 3, borderRadius: "50%", backgroundColor: alpha(C.muted, 0.5) }} />
+                          <LocationOnIcon sx={{ color: T, fontSize: 14, flexShrink: 0 }} />
+                          <Typography sx={{ ...f, fontSize: 13, color: C.mutedDark }}>{order.customer_address.area}</Typography>
+                        </>
+                      )}
                     </Box>
                   )}
-                </Box>
 
-                {/* Action buttons: Receive Money + Return Order */}
+                  {/* Call + WhatsApp always side by side */}
+                  {canCall && order.customer_phone && (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button startIcon={<PhoneIcon />} component="a" href={`tel:${order.customer_phone}`} fullWidth
+                        sx={{ ...f, border: `1.5px solid ${P}`, color: P, borderRadius: R.soft, py: 1.1, fontSize: 14, textTransform: "none", "&:hover": { backgroundColor: alpha(P, 0.05) } }}>
+                        Call
+                      </Button>
+                      <Button startIcon={<WhatsAppIcon />} component="a"
+                        href={`https://wa.me/${order.customer_phone.replace(/\D/g, "")}`}
+                        target="_blank" rel="noopener noreferrer" fullWidth
+                        sx={{ ...f, border: "1.5px solid #25D366", color: "#25D366", borderRadius: R.soft, py: 1.1, fontSize: 14, textTransform: "none", "&:hover": { backgroundColor: alpha("#25D366", 0.05) } }}>
+                        WhatsApp
+                      </Button>
+                    </Box>
+                  )}
+                </Card>
+
+                {/* action buttons — delivery state only */}
                 {canReceive && (
-                  <Box sx={{ display: "flex", gap: isMobile ? 1 : 1.5, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                    <Button startIcon={<PaymentsIcon />} onClick={openReceiveMoney} disabled={loadingPayment}
-                      fullWidth={isMobile}
-                      sx={{ backgroundColor: P, color: "white", borderRadius: R.cardSm, py: isMobile ? 1 : 1.2, fontWeight: 700, fontSize: isMobile ? 13 : 14, fontFamily: FONT, textTransform: "none", boxShadow: `0 6px 18px ${alpha(P, 0.30)}`, flex: 1, "&:hover": { backgroundColor: C.purpleDark }, "&:disabled": { backgroundColor: alpha(P, 0.45) } }}>
+                  <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 1, px: { xs: 0, sm: 0 } }}>
+                    <Button startIcon={<PaymentsIcon />} onClick={openReceiveMoney} disabled={loadingPayment} fullWidth
+                      sx={{ ...f, backgroundColor: P, color: "white", borderRadius: R.soft, py: 1.4, fontSize: 14, textTransform: "none", boxShadow: `0 4px 12px ${alpha(P, 0.20)}`, "&:hover": { backgroundColor: C.purpleDark }, "&:disabled": { backgroundColor: alpha(P, 0.38) } }}>
                       {loadingPayment ? "Loading…" : "Receive Money"}
                     </Button>
-                    <Button startIcon={<AssignmentReturnIcon />} onClick={openReturnOrder} disabled={loadingPayment}
-                      fullWidth={isMobile}
-                      sx={{ border: `2px solid ${C.red}`, color: C.red, borderRadius: R.cardSm, py: isMobile ? 1 : 1.2, fontWeight: 700, fontSize: isMobile ? 13 : 14, fontFamily: FONT, textTransform: "none", flex: 1, "&:hover": { backgroundColor: alpha(C.red, 0.06) }, "&:disabled": { borderColor: alpha(C.red, 0.35), color: alpha(C.red, 0.35) } }}>
+                    <Button startIcon={<AssignmentReturnIcon />} onClick={() => setReturnDialog(true)} disabled={loadingPayment} fullWidth
+                      sx={{ ...f, border: `1.5px solid ${C.red}`, color: C.red, borderRadius: R.soft, py: 1.4, fontSize: 14, textTransform: "none", "&:hover": { backgroundColor: alpha(C.red, 0.05) }, "&:disabled": { borderColor: alpha(C.red, 0.28), color: alpha(C.red, 0.28) } }}>
                       Return Order
                     </Button>
                   </Box>
@@ -464,126 +512,116 @@ export default function DriverAssignmentDetails() {
         </Fade>
       </Container>
 
-      {/* Confirmation dialog */}
-      <Dialog open={confirmDialogOpen} onClose={() => !loadingPayment && setConfirmDialogOpen(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: R.card, p: 1, overflow: "hidden", position: "relative", "&::before": { content: '""', position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: `linear-gradient(90deg, ${C.red}, #ff867c)` } } }}>
-        <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, color: C.text, pt: 3, fontSize: isMobile ? 16 : 18 }}>Confirm Action</DialogTitle>
+      {/* return confirmation */}
+      <Dialog open={returnDialog} onClose={() => setReturnDialog(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: R.cardSm, overflow: "hidden", position: "relative", "&::before": { content: '""', position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, ${C.red}, #ff867c)` } } }}>
+        <DialogTitle sx={{ ...f, fontSize: 16, color: C.text, pt: 3 }}>Return this order?</DialogTitle>
         <DialogContent>
-          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 13 : 14, color: "#555", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{confirmMessage}</Typography>
+          <Typography sx={{ ...f, fontSize: 13, color: C.mutedDark, lineHeight: 1.6 }}>
+            This will mark the order as returned by the client. No payment will be recorded.{"\n\n"}
+            Order total: <strong>{order?.amount_total} {order?.currency}</strong>
+          </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: isMobile ? 2 : 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => setConfirmDialogOpen(false)} disabled={loadingPayment}
-            sx={{ color: C.muted, fontFamily: FONT, textTransform: "none", borderRadius: R.pill, fontWeight: 600 }}>Cancel</Button>
-          {confirmCallback && (
-            <Button onClick={confirmCallback} disabled={loadingPayment}
-              sx={{ backgroundColor: C.red, color: "white", borderRadius: R.pill, px: 3, fontFamily: FONT, fontWeight: 700, textTransform: "none", "&:hover": { backgroundColor: "#d32f2f" }, "&:disabled": { backgroundColor: alpha(C.red, 0.45) } }}>
-              {loadingPayment ? "Processing…" : "Yes, Return Order"}
-            </Button>
-          )}
+        <DialogActions sx={{ px: 2.5, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setReturnDialog(false)} sx={{ ...f, color: C.muted, textTransform: "none", borderRadius: R.pill }}>Cancel</Button>
+          <Button onClick={confirmReturnOrder} disabled={loadingPayment}
+            sx={{ ...f, backgroundColor: C.red, color: "white", borderRadius: R.pill, px: 2.5, textTransform: "none", fontSize: 13, "&:hover": { backgroundColor: "#d32f2f" }, "&:disabled": { backgroundColor: alpha(C.red, 0.38) } }}>
+            {loadingPayment ? "Processing…" : "Yes, return it"}
+          </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Receive Money dialog */}
-      <Dialog open={payDialogOpen} onClose={() => !loadingPayment && setPayDialogOpen(false)} maxWidth="sm" fullWidth disableScrollLock
-        PaperProps={{ sx: { borderRadius: R.card, p: 1, overflow: "hidden", position: "relative", "&::before": { content: '""', position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: bannerGradient } } }}>
-        <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, color: C.text, pt: 3, fontSize: isMobile ? 16 : 18 }}>Receive Money</DialogTitle>
-        <DialogContent sx={{ pt: 1.5 }}>
-          <Typography sx={{ fontFamily: FONT, fontSize: isMobile ? 12 : 13, color: C.muted, mb: 2 }}>
-            Total must equal order amount. Use <strong>Returned</strong> for any unrecoverable amount.
+      {/* receive money */}
+      <Dialog open={payDialogOpen} onClose={() => !loadingPayment && setPayDialogOpen(false)} maxWidth="xs" fullWidth disableScrollLock
+        PaperProps={{ sx: { borderRadius: R.cardSm, overflow: "hidden", position: "relative", "&::before": { content: '""', position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: bannerGradient } } }}>
+        <DialogTitle sx={{ ...f, fontSize: 16, color: C.text, pt: 3 }}>Receive Money</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography sx={{ ...f, fontSize: 12, color: C.muted, mb: 2, lineHeight: 1.5 }}>
+            Entered total must match the order amount. Use <strong>Returned</strong> for any unrecovered amount.
           </Typography>
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.2, mb: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {allMethods.map((method) => {
-              const isReturned = method.id === "returned";
-              const accent = isReturned ? C.red : P;
+              const isRet = method.id === "returned";
+              const accent = isRet ? C.red : P;
+              const active = paymentEnabled[method.id];
               return (
-                <Box key={method.id} sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1.2, borderRadius: R.soft, backgroundColor: paymentEnabled[method.id] ? alpha(accent, 0.05) : "transparent", border: `1px solid ${paymentEnabled[method.id] ? alpha(accent, 0.25) : "#f0eef5"}`, transition: "all 0.2s ease" }}>
-                  <Box component="input" type="checkbox" checked={paymentEnabled[method.id] || false}
-                    onChange={() => togglePaymentMethod(method.id)}
-                    sx={{ width: 18, height: 18, cursor: "pointer", accentColor: accent, flexShrink: 0 }} />
-                  <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: isMobile ? 13 : 14, color: isReturned ? C.red : C.text, minWidth: 90, flex: 1 }}>
-                    {method.name}
-                  </Typography>
-                  {paymentEnabled[method.id] && (
-                    <Box component="input" type="number" placeholder="0.00"
-                      value={paymentAmounts[method.id] || ""}
-                      onChange={(e) => handleAmountChange(method.id, e.target.value)}
-                      step="0.5" min="0"
-                      style={{ border: "none", borderBottom: `2px solid ${accent}`, padding: "4px 6px", fontSize: 14, width: 90, fontFamily: FONT, outline: "none", fontWeight: 600, color: isReturned ? C.red : P, backgroundColor: "transparent", textAlign: "right" }} />
+                <Box
+                  key={method.id}
+                  sx={{ borderRadius: R.soft, border: `1px solid ${active ? alpha(accent, 0.28) : "#ebebeb"}`, backgroundColor: active ? alpha(accent, 0.03) : "white", transition: "border-color 0.15s ease" }}
+                >
+                  <Box
+                    sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, cursor: "pointer" }}
+                    onClick={() => toggleMethod(method.id)}
+                  >
+                    <Box
+                      component="input" type="checkbox" checked={active || false}
+                      onChange={() => { }}
+                      onClick={(e) => { e.stopPropagation(); toggleMethod(method.id); }}
+                      style={{ width: 16, height: 16, cursor: "pointer", accentColor: accent, flexShrink: 0 }}
+                    />
+                    <Typography sx={{ ...f, fontSize: 13, color: isRet ? C.red : C.text, flex: 1 }}>{method.name}</Typography>
+                  </Box>
+                  {active && (
+                    <Box sx={{ px: 1.5, pb: 1 }}>
+                      <TextField
+                        type="number"
+                        placeholder="0"
+                        value={paymentAmounts[method.id]}
+                        onChange={(e) => setPaymentAmounts((prev) => ({ ...prev, [method.id]: e.target.value }))}
+                        fullWidth size="small"
+                        inputProps={{ inputMode: "decimal", min: 0, step: "any" }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: R.soft, fontSize: 14, fontFamily: FONT, color: accent,
+                            "& fieldset": { borderColor: alpha(accent, 0.30) },
+                            "&:hover fieldset": { borderColor: alpha(accent, 0.50) },
+                            "&.Mui-focused fieldset": { borderColor: accent },
+                          },
+                          "& input[type=number]": { MozAppearance: "textfield" },
+                          "& input[type=number]::-webkit-outer-spin-button": { WebkitAppearance: "none", margin: 0 },
+                          "& input[type=number]::-webkit-inner-spin-button": { WebkitAppearance: "none", margin: 0 },
+                        }}
+                      />
+                    </Box>
                   )}
                 </Box>
               );
             })}
           </Box>
 
-          {/* Running total indicator */}
+          {/* running total */}
           {(() => {
-            const orderTotal = assignment?.orders?.[0]?.amount_total || 0;
-            const currency = assignment?.orders?.[0]?.currency || "";
-            const diff = totalEntered - orderTotal;
-            const color = Math.abs(diff) < 0.01 ? T : C.red;
+            const total = order?.amount_total || 0;
+            const cur = order?.currency || "";
+            const col = amountOk ? T : C.red;
             return (
-              <Box sx={{ p: 1.5, borderRadius: R.soft, backgroundColor: alpha(color, 0.06), border: `1px solid ${alpha(color, 0.25)}`, display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                <Typography sx={{ fontFamily: FONT, fontSize: 13, color: color, fontWeight: 600 }}>
-                  {Math.abs(diff) < 0.01 ? "✓ Total matches" : diff > 0 ? `Over by ${diff.toFixed(2)}` : `Remaining: ${Math.abs(diff).toFixed(2)}`}
+              <Box sx={{ mt: 1.5, px: 1.5, py: 0.9, borderRadius: R.soft, border: `1px solid ${alpha(col, 0.22)}`, backgroundColor: alpha(col, 0.04), display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ ...f, fontSize: 12, color: col }}>
+                  {amountOk ? "✓ Matches" : amountDiff > 0 ? `Over by ${amountDiff.toFixed(2)}` : `Remaining ${Math.abs(amountDiff).toFixed(2)}`}
                 </Typography>
-                <Typography sx={{ fontFamily: FONT, fontSize: 14, fontWeight: 800, color }}>
-                  {totalEntered.toFixed(2)} / {orderTotal.toFixed(2)} {currency}
+                <Typography sx={{ ...f, fontSize: 12, color: col }}>
+                  {totalEntered.toFixed(2)} / {total.toFixed(2)} {cur}
                 </Typography>
               </Box>
             );
           })()}
 
-          <TextField multiline rows={isMobile ? 2 : 3} placeholder="Additional notes (optional)" value={paymentNote}
+          <TextField
+            multiline rows={2} placeholder="Notes (optional)" value={paymentNote}
             onChange={(e) => setPaymentNote(e.target.value)} fullWidth size="small"
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: R.soft, fontSize: 13, fontFamily: FONT, "&:hover fieldset": { borderColor: P }, "&.Mui-focused fieldset": { borderColor: P } } }} />
+            sx={{ mt: 1.5, "& .MuiOutlinedInput-root": { borderRadius: R.soft, fontSize: 13, fontFamily: FONT, "&.Mui-focused fieldset": { borderColor: P } } }}
+          />
         </DialogContent>
-        <DialogActions sx={{ px: isMobile ? 2 : 3, pb: 2.5, gap: 1 }}>
+        <DialogActions sx={{ px: 2.5, pb: 2.5, gap: 1 }}>
           <Button onClick={() => setPayDialogOpen(false)} disabled={loadingPayment}
-            sx={{ color: C.muted, fontFamily: FONT, textTransform: "none", borderRadius: R.pill, fontWeight: 600 }}>Cancel</Button>
-          <Button onClick={confirmReceiveMoney} disabled={loadingPayment || Math.abs(totalEntered - (assignment?.orders?.[0]?.amount_total || 0)) > 0.01}
-            sx={{ backgroundColor: P, color: "white", borderRadius: R.pill, px: 3, fontFamily: FONT, fontWeight: 700, textTransform: "none", boxShadow: `0 4px 14px ${alpha(P, 0.28)}`, "&:hover": { backgroundColor: C.purpleDark }, "&:disabled": { backgroundColor: alpha(P, 0.40) } }}>
+            sx={{ ...f, color: C.muted, textTransform: "none", borderRadius: R.pill }}>Cancel</Button>
+          <Button onClick={submitPayment} disabled={loadingPayment || !amountOk}
+            sx={{ ...f, backgroundColor: P, color: "white", borderRadius: R.pill, px: 2.5, textTransform: "none", fontSize: 13, "&:hover": { backgroundColor: C.purpleDark }, "&:disabled": { backgroundColor: alpha(P, 0.32) } }}>
             {loadingPayment ? "Processing…" : "Confirm"}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
-}
-
-function LineDetail({ label, value, highlight, bold }) {
-  return (
-    <Box>
-      <Typography sx={{ fontFamily: FONT, fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px", lineHeight: 1 }}>{label}</Typography>
-      <Typography sx={{ fontFamily: FONT, fontSize: 13, fontWeight: bold ? 700 : 500, color: highlight || C.text, mt: 0.25 }}>{value}</Typography>
-    </Box>
-  );
-}
-
-function cardSx(isMobile) {
-  return {
-    backgroundColor: "white",
-    borderRadius: isMobile ? R.cardSm : R.card,
-    border: `1px solid ${alpha(C.purple, 0.10)}`,
-    p: isMobile ? 2 : 2.5,
-    mb: 1.5,
-    position: "relative",
-    overflow: "hidden",
-    "&::before": { content: '""', position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: bannerGradient },
-  };
-}
-
-function outlineBtn(color, isMobile) {
-  return {
-    border: `2px solid ${color}`,
-    color,
-    borderRadius: R.soft,
-    px: isMobile ? 1.5 : 2.5,
-    py: isMobile ? 0.8 : 1,
-    fontWeight: 700,
-    fontSize: isMobile ? 12 : 13,
-    fontFamily: FONT,
-    textTransform: "none",
-    "&:hover": { backgroundColor: alpha(color, 0.06) },
-  };
 }

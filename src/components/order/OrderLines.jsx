@@ -241,21 +241,27 @@ export default function OrderLines({
     calcMaxDiscount(orderLines, isDeliveryId, isRewardId, isCustomerServiceId),
     [orderLines]);
 
+  const effectiveMaxDiscount = useMemo(() =>
+    Math.floor(calculatedMaxDiscount * 1000) / 1000,
+    [calculatedMaxDiscount]);
+
   const maxDiscountPercent = useMemo(() =>
-    productTotal > 0 ? Math.floor((calculatedMaxDiscount / productTotal) * 100) : 0,
-    [calculatedMaxDiscount, productTotal]);
+    productTotal > 0 ? Math.floor((effectiveMaxDiscount / productTotal) * 100 * 1000) / 1000 : 0,
+    [effectiveMaxDiscount, productTotal]);
 
   const totals = useMemo(() => {
     let revenueBeforeDiscount = 0;
     let discountTotal = 0;
     let cost = 0;
     orderLines.forEach(l => {
-      if (isRewardId(l.id)) return;
       const lineTotal = (l.price || 0) * (l.qty || 0);
       const lineDiscount = lineTotal * ((l.discount_percent || 0) / 100);
       revenueBeforeDiscount += lineTotal;
       discountTotal += lineDiscount;
       cost += (l.cost || 0) * (l.qty || 0);
+      if (isRewardId(l.id)) {
+        console.log('reward line', l);
+      }
     });
     const revenue = revenueBeforeDiscount - discountTotal;
     const margin = revenue - cost;
@@ -446,6 +452,22 @@ export default function OrderLines({
     return () => clearTimeout(t);
   }, [productLinesSignature]);
 
+  useEffect(() => {
+    if (appliedLoyalties.length === 0) return;
+    const cacheIds = new Set(loyaltyCache.map(p => p.id));
+    const cacheMap = Object.fromEntries(loyaltyCache.map(p => [p.id, p]));
+
+    const staleIds = appliedLoyalties
+      .filter(al => !cacheIds.has(al.loyalty_id) || cacheMap[al.loyalty_id]?.max_activations === 0)
+      .map(al => al.loyalty_id);
+
+    if (staleIds.length === 0) return;
+
+    const staleSet = new Set(staleIds);
+    setOrderLines(prev => prev.filter(l => !isRewardId(l.id) || !staleSet.has(l.loyalty_id)));
+    onAppliedLoyaltiesChange?.(appliedLoyalties.filter(al => !staleSet.has(al.loyalty_id)));
+  }, [loyaltyCache]);
+
   const handleGetApplicableLoyalties = () => {
     if (loyaltyCache.length === 0) return;
     setFetchedLoyalties(loyaltyCache);
@@ -471,6 +493,11 @@ export default function OrderLines({
     setFetchedLoyalties([]);
   };
 
+  const handleRemoveAppliedLoyalty = (loyaltyId) => {
+    setOrderLines(prev => prev.filter(l => l.loyalty_id !== loyaltyId));
+    onAppliedLoyaltiesChange?.(appliedLoyalties.filter(a => a.loyalty_id !== loyaltyId));
+  };
+
   const handleConfirmReward = () => {
     if (!selectedLoyalty) return;
     const reward = selectedLoyalty.rewards?.[0];
@@ -488,8 +515,8 @@ export default function OrderLines({
     setOrderLines(prev => [...prev, {
       id: `reward_${selectedLoyalty.id}_${Date.now()}`,
       name: `Gift: ${rewardProduct.name}`,
-      price: 0,
-      cost: 0,
+      price: rewardProduct.price,
+      cost: rewardProduct.cost,
       qty: totalQty,
       product_id: rewardProduct.id,
       loyalty_id: selectedLoyalty.id,
@@ -527,12 +554,15 @@ export default function OrderLines({
     if (!canAskDiscountPermission) { alert('Complete required fields before applying discount.'); return; }
     const amount = resolveDiscountAmount();
     if (!amount) { alert('Please enter a valid discount value.'); return; }
-    if (amount > calculatedMaxDiscount && !force) { setShowDiscountDialog(false); setShowExceededDialog(true); return; }
+
+    const withinTolerance = amount <= effectiveMaxDiscount * 1.002;
+    if (!withinTolerance && !force) { setShowDiscountDialog(false); setShowExceededDialog(true); return; }
 
     const violations = validateStockAvailability();
     if (violations.length > 0) { alertStockViolations(violations); return; }
 
-    const newLines = distributeDiscount(orderLines, amount, isDeliveryId, isRewardId, isCustomerServiceId);
+    const cappedAmount = withinTolerance ? Math.min(amount, effectiveMaxDiscount) : amount;
+    const newLines = distributeDiscount(orderLines, cappedAmount, isDeliveryId, isRewardId, isCustomerServiceId);
     setOrderLines(newLines);
     setDiscountStatus('applied');
     setWaitingForPermission(false);
@@ -808,7 +838,7 @@ export default function OrderLines({
 
                             {/* delete */}
                             <TableCell align="right" sx={{ px: 0.5 }}>
-                              {!line.isDeliveryCharge && (
+                              {!line.isDeliveryCharge && !line.isReward && (
                                 <IconButton onClick={() => removeLine(line.id)} sx={{ color: C.red, p: '4px', '&:hover': { backgroundColor: alpha(C.red, 0.10) } }}>
                                   <DeleteIcon sx={{ fontSize: 16 }} />
                                 </IconButton>
@@ -941,7 +971,7 @@ export default function OrderLines({
           <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, color: C.text, pt: 3 }}>Apply Discount</DialogTitle>
           <DialogContent sx={{ pt: 1 }}>
             <Typography variant="body2" sx={{ fontFamily: FONT, color: C.mutedDark, mb: 2 }}>
-              Max allowed: <strong>{discountType === 'fixed' ? `${calculatedMaxDiscount.toFixed(2)} ${currency_symbol}` : `${maxDiscountPercent}%`}</strong>
+              Max allowed: <strong>{discountType === 'fixed' ? `${effectiveMaxDiscount.toFixed(3)} ${currency_symbol}` : `${maxDiscountPercent.toFixed(3)}%`}</strong>
             </Typography>
             <FormControl sx={{ width: '100%' }}>
               <RadioGroup value={discountType} onChange={(e) => { setDiscountType(e.target.value); setDiscountValue(''); }} sx={{ gap: 1 }}>
@@ -954,7 +984,7 @@ export default function OrderLines({
               </RadioGroup>
             </FormControl>
             <Box sx={{ mt: 2 }}>
-              <TextField label={discountType === 'percent' ? 'Discount %' : `Discount Amount (${currency_symbol || ''})`} value={discountValue} onChange={(e) => setDiscountValue(e.target.value.replace(/[^\d.]/g, ''))} fullWidth size="medium" sx={{ '& .MuiOutlinedInput-root': { borderRadius: { xs: R.cardSm, sm: R.pill }, backgroundColor: 'white', fontFamily: FONT, '& fieldset': { borderColor: alpha(C.gold, 0.30), borderWidth: '1.5px' }, '&:hover fieldset': { borderColor: alpha(C.gold, 0.55) }, '&.Mui-focused fieldset': { borderColor: C.gold, borderWidth: '2px' } }, '& .MuiInputLabel-root': { fontFamily: FONT, color: C.muted, '&.Mui-focused': { color: C.gold } }, '& .MuiInputBase-input': { fontFamily: FONT } }} helperText={discountType === 'percent' ? `Products total: ${productTotal.toFixed(2)} ${currency_symbol}` : 'Distributed across eligible lines.'} />
+              <TextField label={discountType === 'percent' ? 'Discount %' : `Discount Amount (${currency_symbol || ''})`} value={discountValue} onChange={(e) => setDiscountValue(e.target.value.replace(/[^\d.]/g, ''))} fullWidth size="medium" sx={{ '& .MuiOutlinedInput-root': { borderRadius: { xs: R.cardSm, sm: R.pill }, backgroundColor: 'white', fontFamily: FONT, '& fieldset': { borderColor: alpha(C.gold, 0.30), borderWidth: '1.5px' }, '&:hover fieldset': { borderColor: alpha(C.gold, 0.55) }, '&.Mui-focused fieldset': { borderColor: C.gold, borderWidth: '2px' } }, '& .MuiInputLabel-root': { fontFamily: FONT, color: C.muted, '&.Mui-focused': { color: C.gold } }, '& .MuiInputBase-input': { fontFamily: FONT } }} helperText={discountType === 'percent' ? `Products total: ${productTotal.toFixed(3)} ${currency_symbol}` : 'Distributed across eligible lines.'} />
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, gap: 1, display: 'flex', justifyContent: 'space-between' }}>
@@ -977,7 +1007,7 @@ export default function OrderLines({
           <DialogTitle sx={{ fontFamily: FONT, fontWeight: 800, color: C.text, pt: 3 }}>Discount Exceeded</DialogTitle>
           <DialogContent sx={{ pt: 1 }}>
             <Typography variant="body2" sx={{ fontFamily: FONT, color: C.mutedDark, mb: 1 }}>
-              The entered discount exceeds the allowed maximum of <strong>{calculatedMaxDiscount.toFixed(2)} {currency_symbol}</strong>.
+              The entered discount exceeds the allowed maximum of <strong>{effectiveMaxDiscount.toFixed(3)} {currency_symbol}</strong>.
             </Typography>
             <Typography variant="body2" sx={{ fontFamily: FONT, color: C.mutedDark }}>
               {isCCManager ? 'As a manager, you can allow it.' : 'You need manager approval to proceed.'}
@@ -1095,6 +1125,9 @@ export default function OrderLines({
                       <RedeemIcon sx={{ color: C.pink, fontSize: 18, flexShrink: 0 }} />
                       <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '14px', color: C.text, flex: 1 }}>{al.loyalty_name}</Typography>
                       <Chip label={`${al.activations}× applied`} size="small" sx={{ backgroundColor: alpha(C.pink, 0.1), color: C.pink, fontFamily: FONT, fontWeight: 700, fontSize: '11px', height: '22px', borderRadius: '50px' }} />
+                      <IconButton size="small" onClick={() => handleRemoveAppliedLoyalty(al.loyalty_id)} sx={{ color: C.red, border: `1.5px solid ${alpha(C.red, 0.25)}`, borderRadius: '8px', p: '4px', '&:hover': { backgroundColor: alpha(C.red, 0.08), borderColor: C.red } }}>
+                        <CloseIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
                     </Box>
                     <Box sx={{ px: 2, py: 1.25, display: 'flex', gap: 4 }}>
                       <Box>

@@ -399,7 +399,7 @@ export default function OrderForm() {
     return true;
   };
 
-  // ─── Task 8: transform lines — no discount-product line, send discount_percent per line
+  // ─── Task 8: transform lines 
   const transformLinesToBackend = (lines) => {
     const transformed = [];
     lines.forEach(line => {
@@ -407,7 +407,7 @@ export default function OrderForm() {
         transformed.push({
           product_id: line.product_id,
           requested_qty: line.qty,
-          price_unit: 0,
+          price_unit: line.price,
           discount_percent: 100,
           is_delivery_charge: false,
           is_loyalty: true,
@@ -423,6 +423,7 @@ export default function OrderForm() {
           is_delivery_charge: true,
           is_loyalty: false,
           loyalty_id: null,
+          note: productNotes[line.id] || '',
         });
       } else if (line.isCustomerService) {
         transformed.push({
@@ -431,6 +432,7 @@ export default function OrderForm() {
           price_unit: line.price,
           discount_percent: 0,
           is_delivery_charge: false,
+          is_customer_service: true,
           is_loyalty: false,
           loyalty_id: null,
           note: productNotes[line.id] || '',
