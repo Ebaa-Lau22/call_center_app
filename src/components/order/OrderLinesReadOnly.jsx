@@ -220,7 +220,7 @@ export default function OrderLinesReadOnly({
 
                             {/* subtotal before discount */}
                             <TableCell sx={{ ...tdSx, color: C.mutedDark }}>
-                              {isServiceRow || isReward ? '—' : `${lineGross.toFixed(2)} ${currency_symbol}`}
+                              {isServiceRow ? '—' : `${lineGross.toFixed(2)} ${currency_symbol}`}
                             </TableCell>
 
                             {/* subtotal after discount */}

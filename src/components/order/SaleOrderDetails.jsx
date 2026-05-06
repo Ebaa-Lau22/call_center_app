@@ -72,10 +72,10 @@ const STATUS_COLORS = {
   in_preparation: { bg: '#fff3e0', color: '#ef6c00' },
   preparation_ended: { bg: '#e0f2f1', color: '#00897b' },
   confirmed: { bg: '#e8f5e9', color: '#2e7d32' },
+  received: { bg: '#e8f5ef', color: C.teal },
   canceled: { bg: '#ffebee', color: '#c62828' },
-  // new states
-  returned: { bg: '#fbe9e7', color: '#bf360c' },   // deep burnt-orange — signals something came back
-  partially_received: { bg: '#e8eaf6', color: '#283593' },   // indigo — partial/incomplete feel
+  rejected_by_client: { bg: '#ead4d2', color: '#8c0e00' },   
+  partially_received: { bg: '#e8eaf6', color: '#283593' },   
 };
 const getStatusColor = (s) => STATUS_COLORS[s] || { bg: '#f5f5f5', color: '#616161' };
 
@@ -132,6 +132,7 @@ export default function OrderDetailsReadOnly() {
     let maxAllowed = 0;
     let discountValue = 0;
     orderLinesData.forEach(l => {
+      if (l.is_loyalty || String(l.id)?.startsWith('reward_')) return;
       const lineTotal = (l.price || 0) * (l.qty || 0);
       const lineDiscount = lineTotal * ((l.discount || 0) / 100);
       discountValue += lineDiscount;
@@ -354,23 +355,23 @@ export default function OrderDetailsReadOnly() {
                 <Box sx={{
                   backgroundColor: 'white', borderRadius: { xs: R.cardSm, sm: R.card },
                   p: { xs: 3, sm: 4 }, mb: 3,
-                  boxShadow: '0 8px 32px rgba(126, 87, 194, 0.12)',
-                  border: '1px solid rgba(126, 87, 194, 0.08)',
+                  boxShadow: '0 4px 20px rgba(126, 87, 194, 0.10)',
+                  border: `1px solid ${alpha(C.purple, 0.12)}`,
                   position: 'relative', overflow: 'hidden',
-                  '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '5px', background: 'linear-gradient(90deg, #efb359, #f9a825)' },
+                  '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: `linear-gradient(90deg, ${C.gold}, #f5e070, ${C.gold})` },
                 }}>
                   {isCCEmp && (
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#e65100', mt: 1, flexShrink: 0 }} />
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: C.purple, mt: 1, flexShrink: 0 }} />
                       <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontFamily: FONT, fontWeight: 700, color: '#e65100', fontSize: 15, mb: 1 }}>Waiting for Manager Approval</Typography>
-                        <Typography sx={{ fontFamily: FONT, color: alpha('#000', 0.7), fontSize: 14, lineHeight: 1.6 }}>
+                        <Typography sx={{ fontFamily: FONT, fontWeight: 700, color: C.purple, fontSize: 15, mb: 1 }}>Waiting for Manager Approval</Typography>
+                        <Typography sx={{ fontFamily: FONT, color: alpha('#000', 0.65), fontSize: 14, lineHeight: 1.7 }}>
                           This order has a discount of{' '}
-                          <Box component="span" sx={{ color: '#d32f2f', fontWeight: 700 }}>{discountDetails.discountValue} {sessionCurrency}</Box>
+                          <Box component="span" sx={{ color: C.goldDark, fontWeight: 700 }}>{discountDetails.discountValue} {sessionCurrency}</Box>
                           {' '}exceeding the maximum allowed{' '}
-                          <Box component="span" sx={{ color: '#f57c00', fontWeight: 700 }}>{discountDetails.maxAllowed} {sessionCurrency}</Box>
+                          <Box component="span" sx={{ color: C.muted, fontWeight: 600 }}>{discountDetails.maxAllowed} {sessionCurrency}</Box>
                           {' '}by{' '}
-                          <Box component="span" sx={{ color: '#d32f2f', fontWeight: 700 }}>{discountDetails.difference} {sessionCurrency}</Box>.
+                          <Box component="span" sx={{ color: C.red, fontWeight: 700 }}>{discountDetails.difference} {sessionCurrency}</Box>.
                           <br />Manager approval is required before proceeding.
                         </Typography>
                       </Box>
@@ -380,30 +381,30 @@ export default function OrderDetailsReadOnly() {
                   {showManagerTopButtons && (
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 3 }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#e65100', mt: 1, flexShrink: 0 }} />
+                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: C.purple, mt: 1, flexShrink: 0 }} />
                         <Box sx={{ flex: 1 }}>
-                          <Typography sx={{ fontFamily: FONT, fontWeight: 700, color: '#e65100', fontSize: 15, mb: 1 }}>Discount Approval Required</Typography>
-                          <Typography sx={{ fontFamily: FONT, color: alpha('#000', 0.7), fontSize: 14, lineHeight: 1.6 }}>
+                          <Typography sx={{ fontFamily: FONT, fontWeight: 700, color: C.purple, fontSize: 15, mb: 1 }}>Discount Approval Required</Typography>
+                          <Typography sx={{ fontFamily: FONT, color: alpha('#000', 0.65), fontSize: 14, lineHeight: 1.7 }}>
                             Discount of{' '}
-                            <Box component="span" sx={{ color: '#d32f2f', fontWeight: 700 }}>{discountDetails.discountValue} {sessionCurrency}</Box>
-                            {' '}exceeds maximum{' '}
-                            <Box component="span" sx={{ color: '#f57c00', fontWeight: 700 }}>{discountDetails.maxAllowed} {sessionCurrency}</Box>
+                            <Box component="span" sx={{ color: C.goldDark, fontWeight: 700 }}>{discountDetails.discountValue} {sessionCurrency}</Box>
+                            {' '}exceeds the max allowed{' '}
+                            <Box component="span" sx={{ color: C.muted, fontWeight: 600 }}>{discountDetails.maxAllowed} {sessionCurrency}</Box>
                             {' '}by{' '}
-                            <Box component="span" sx={{ color: '#c62828', fontWeight: 700 }}>{discountDetails.difference} {sessionCurrency}</Box>.
+                            <Box component="span" sx={{ color: C.red, fontWeight: 700 }}>{discountDetails.difference} {sessionCurrency}</Box>.
                           </Typography>
-                          <Typography sx={{ fontFamily: FONT, color: alpha('#000', 0.6), mt: 0.5, fontSize: 13 }}>
-                            Approve to submit, or reject to zero out the discount and reset to draft.
+                          <Typography sx={{ fontFamily: FONT, color: alpha('#000', 0.45), mt: 0.5, fontSize: 13 }}>
+                            Approve to submit, or reject to zero out all discounts and reset to draft.
                           </Typography>
                         </Box>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                         <Button startIcon={<ThumbDownAltIcon />} onClick={rejectDiscount} disabled={busyAction}
-                          sx={{ border: `2px solid ${C.red}`, color: C.red, borderRadius: R.pill, px: 3.5, py: 1.2, fontWeight: 700, fontSize: '13px', fontFamily: FONT, textTransform: 'none', '&:hover': { backgroundColor: alpha(C.red, 0.08), borderColor: '#d32f2f' }, '&.Mui-disabled': { borderColor: alpha(C.red, 0.5), color: alpha(C.red, 0.5) } }}>
-                          Reject Discount
+                          sx={{ border: `1.5px solid ${alpha(C.muted, 0.5)}`, color: C.mutedDark, borderRadius: R.pill, px: 3.5, py: 1.2, fontWeight: 600, fontSize: '13px', fontFamily: FONT, textTransform: 'none', '&:hover': { backgroundColor: alpha(C.muted, 0.07) }, '&.Mui-disabled': { borderColor: alpha(C.muted, 0.25), color: alpha(C.muted, 0.4) } }}>
+                          Reject
                         </Button>
                         <Button startIcon={<ThumbUpAltIcon />} onClick={approveDiscount} disabled={busyAction}
-                          sx={{ backgroundColor: '#4caf50', color: 'white', borderRadius: R.pill, px: 3.5, py: 1.2, fontWeight: 700, fontSize: '13px', fontFamily: FONT, textTransform: 'none', boxShadow: '0 4px 12px rgba(76,175,80,0.25)', '&:hover': { backgroundColor: '#45a049' }, '&.Mui-disabled': { backgroundColor: alpha('#4caf50', 0.5) } }}>
-                          {busyAction ? 'Processing…' : 'Approve Discount'}
+                          sx={{ backgroundColor: C.teal, color: 'white', borderRadius: R.pill, px: 3.5, py: 1.2, fontWeight: 700, fontSize: '13px', fontFamily: FONT, textTransform: 'none', boxShadow: `0 4px 12px ${alpha(C.teal, 0.28)}`, '&:hover': { backgroundColor: C.tealDark }, '&.Mui-disabled': { backgroundColor: alpha(C.teal, 0.4) } }}>
+                          {busyAction ? 'Processing…' : 'Approve'}
                         </Button>
                       </Box>
                     </Box>

@@ -53,9 +53,10 @@ const getStatusColor = (state) => {
     in_preparation: { bg: '#fff3e0', color: '#ef6c00' },
     preparation_ended: { bg: '#e0f2f1', color: '#00897b' },
     confirmed: { bg: '#e8f5e9', color: '#2e7d32' },
+    received: { bg: '#e8f5ef', color: C.teal },
     canceled: { bg: '#ffebee', color: '#c62828' },
-    returned: { bg: '#fbe9e7', color: '#bf360c' },
-    partially_received: { bg: '#e8eaf6', color: '#283593' },
+    rejected_by_client: { bg: '#ead4d2', color: '#8c0e00' },   
+    partially_received: { bg: '#e8eaf6', color: '#283593' },   
   };
   return map[state] || { bg: '#f5f5f5', color: '#616161' };
 };

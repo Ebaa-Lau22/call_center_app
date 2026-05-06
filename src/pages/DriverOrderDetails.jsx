@@ -10,6 +10,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PhoneIcon from "@mui/icons-material/Phone";
 import PaymentsIcon from "@mui/icons-material/Payments";
+import PaymentIcon from "@mui/icons-material/Payment"; 
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import StoreIcon from "@mui/icons-material/Store";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
@@ -160,6 +161,8 @@ export default function DriverAssignmentDetails() {
   const canAct = assignment?.state === "waiting_for_approve";
   const canCall = assignment?.state === "delivery";
   const canReceive = assignment?.state === "delivery";
+  const isDone = DONE_STATES.includes(assignment?.state);
+  const orderPaymnets = assignment?.payment_methods || [];
 
   // ── actions ───────────────────────────────────────────────────────────────
 
@@ -428,18 +431,26 @@ export default function DriverAssignmentDetails() {
                   <Card>
                     <SLabel>Products ({order.order_lines.length})</SLabel>
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                      {order.order_lines.map((line, idx) => (
-                        <Box key={line.id || idx} sx={{ borderRadius: R.soft, border: "1px solid #f0eef5", p: 1.5 }}>
-                          <Typography sx={{ ...f, fontSize: 13, color: C.text, mb: 1 }}>{line.product_name}</Typography>
-                          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                            <MiniStat label="Qty" value={line.quantity} />
-                            <MiniStat label="Unit price" value={`${Number(line.price_unit).toFixed(2)} ${order.currency}`} />
-                            {line.discount > 0 && <MiniStat label="Discount" value={`${line.discount}%`} color={C.gold} />}
-                            {line.discount > 0 && <MiniStat label="Disc. amt" value={`−${Number(line.discount_amount).toFixed(2)}`} color={C.gold} />}
-                            <MiniStat label="Subtotal" value={`${Number(line.subtotal).toFixed(2)} ${order.currency}`} color={P} />
+                      {order.order_lines.map((line, idx) => {
+                        if (line.display_type) {
+                          return (
+                            <Box key={line.id || idx} sx={{ borderRadius: R.soft, backgroundColor: alpha(C.muted, 0.06), border: `1px solid ${alpha(C.muted, 0.14)}`, px: 1.5, py: 1 }}>
+                              <Typography sx={{ ...f, fontSize: 12, color: C.mutedDark, fontStyle: "italic" }}>{line.product_name}</Typography>
+                            </Box>
+                          );
+                        }
+                        return (
+                          <Box key={line.id || idx} sx={{ borderRadius: R.soft, border: "1px solid #f0eef5", p: 1.5 }}>
+                            <Typography sx={{ ...f, fontSize: 13, color: C.text, mb: 1 }}>{line.product_name}</Typography>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                              <MiniStat label="Qty" value={line.quantity} />
+                              <MiniStat label="Unit price" value={`${Number(line.price_unit).toFixed(2)} ${order.currency}`} />
+                              {line.discount > 0 && <MiniStat label="Discount" value={`${line.discount}%`} color={C.gold} />}
+                              <MiniStat label="Subtotal" value={`${Number(line.subtotal).toFixed(2)} ${order.currency}`} color={P} />
+                            </Box>
                           </Box>
-                        </Box>
-                      ))}
+                        );
+                      })}
                     </Box>
 
                     <Divider sx={{ my: 1.5, borderColor: "#f0eef5" }} />
@@ -451,6 +462,21 @@ export default function DriverAssignmentDetails() {
                       </>
                     )}
                     <Row2 label="Total" value={`${Number(order.amount_total).toFixed(2)} ${order.currency}`} color={P} strong />
+                  </Card>
+                )}
+
+                {/* payment methods used — only when done, and only if there are any to show */}
+                {isDone && orderPaymnets.length > 0 && (
+                  <Card>
+                    <SLabel>Payment Methods</SLabel>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.8, mt: 0.5 }}>
+                      {orderPaymnets.map((pm, i) => (
+                        <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Typography sx={{ ...f, fontSize: 13, color: C.mutedDark }}>{pm.name}</Typography>
+                          <Typography sx={{ ...f, fontSize: 13, color: P, fontWeight: 500 }}>{Number(pm.amount).toFixed(2)} {order?.currency}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
                   </Card>
                 )}
 

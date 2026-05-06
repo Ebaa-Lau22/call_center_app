@@ -254,14 +254,15 @@ export default function OrderLines({
     let discountTotal = 0;
     let cost = 0;
     orderLines.forEach(l => {
+      if (isRewardId(l.id)) {
+        cost += (l.cost || 0) * (l.qty || 0);
+        return;
+      }
       const lineTotal = (l.price || 0) * (l.qty || 0);
       const lineDiscount = lineTotal * ((l.discount_percent || 0) / 100);
       revenueBeforeDiscount += lineTotal;
       discountTotal += lineDiscount;
       cost += (l.cost || 0) * (l.qty || 0);
-      if (isRewardId(l.id)) {
-        console.log('reward line', l);
-      }
     });
     const revenue = revenueBeforeDiscount - discountTotal;
     const margin = revenue - cost;
@@ -806,7 +807,10 @@ export default function OrderLines({
                             {/* price */}
                             <TableCell sx={tdSx}>
                               {line.isCustomerService ? (
-                                <TextField type="number" size="small" value={line.price} onChange={(e) => updatePrice(line.id, e.target.value)} inputProps={{ min: 0, style: { textAlign: 'center', fontWeight: 600, fontSize: '12px', padding: '4px 6px' } }} sx={{ width: '68px', '& .MuiOutlinedInput-root': { borderRadius: R.soft, fontFamily: FONT, backgroundColor: alpha(C.teal, 0.07), '& fieldset': { borderColor: alpha(C.teal, 0.4) }, '&:hover fieldset': { borderColor: C.teal }, '&.Mui-focused fieldset': { borderColor: C.teal } }, '& input[type=number]': { MozAppearance: 'textfield' }, '& input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }} />
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <TextField type="number" size="small" value={line.price} onChange={(e) => updatePrice(line.id, e.target.value)} inputProps={{ min: 0, style: { textAlign: 'center', fontWeight: 600, fontSize: '12px', padding: '4px 6px' } }} sx={{ width: '52px', '& .MuiOutlinedInput-root': { borderRadius: R.soft, fontFamily: FONT, backgroundColor: alpha(C.teal, 0.07), '& fieldset': { borderColor: alpha(C.teal, 0.4) }, '&:hover fieldset': { borderColor: C.teal }, '&.Mui-focused fieldset': { borderColor: C.teal } }, '& input[type=number]': { MozAppearance: 'textfield' }, '& input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }} />
+                                  <Typography sx={{ fontFamily: FONT, fontSize: '11px', color: C.muted, flexShrink: 0 }}>{currency_symbol}</Typography>
+                                </Box>
                               ) : `${(line.price || 0).toFixed(2)} ${currency_symbol}`}
                             </TableCell>
 
@@ -825,7 +829,7 @@ export default function OrderLines({
 
                             {/* subtotal before discount */}
                             <TableCell sx={{ ...tdSx, color: C.mutedDark }}>
-                              {isService || line.isReward ? '—' : `${lineGross.toFixed(2)} ${currency_symbol}`}
+                              {isService ? '—' : `${lineGross.toFixed(2)} ${currency_symbol}`}
                             </TableCell>
 
                             {/* subtotal after discount */}
@@ -925,7 +929,7 @@ export default function OrderLines({
             <Typography sx={{ fontWeight: 700, fontFamily: FONT, fontSize: { xs: '17px', sm: '20px' }, color: C.text }}>Browse Products</Typography>
             {browseTotalCount > 0 && <Box sx={{ px: 1.5, py: 0.3, borderRadius: R.pill, background: bannerGradient, color: 'white', fontFamily: FONT, fontWeight: 700, fontSize: '11px' }}>{browseTotalCount}</Box>}
           </DialogTitle>
-          <DialogContent sx={{ pt: 4, px: { xs: 2.5, sm: 4 }, zIndex: 2}}>
+          <DialogContent sx={{ pt: 4, px: { xs: 2.5, sm: 4 }, zIndex: 2 }}>
             <TextField placeholder="Search products by name, code, or ingredient..." size="medium" fullWidth sx={{ ...textFieldSx, mb: 3 }} value={dialogSearch} onChange={(e) => setDialogSearch(e.target.value)} InputProps={{ startAdornment: <SearchIcon sx={{ color: C.muted, mr: 1 }} /> }} autoFocus />
             {!dialogSearch && <Box sx={{ py: 8, textAlign: 'center' }}><SearchIcon sx={{ fontSize: 48, color: alpha(C.purple, 0.20), mb: 1.5 }} /><Typography sx={{ fontFamily: FONT, color: C.muted, fontSize: '14px' }}>Type something to find products</Typography></Box>}
             {dialogSearch && (
@@ -1003,7 +1007,7 @@ export default function OrderLines({
         </Dialog>
 
         {/* exceeded discount dialog */}
-        <Dialog open={showExceededDialog} onClose={() => setShowExceededDialog(false)} PaperProps={{ sx: { borderRadius: '24px', p: 2, boxShadow: '0 18px 50px rgba(239, 83, 80, 0.18)', border: '1px solid rgba(239, 83, 80, 0.12)', overflow: 'hidden', position: 'relative', '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #ef5350, #ff867c)' } } }}>
+        <Dialog open={showExceededDialog} onClose={() => setShowExceededDialog(false)} PaperProps={{ sx: { borderRadius: '24px', p: 2, boxShadow: `0 18px 50px ${alpha(C.purple, 0.15)}`, border: `1px solid ${alpha(C.purple, 0.12)}`, overflow: 'hidden', position: 'relative', '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: bannerGradient } } }}>
           <DialogTitle sx={{ fontFamily: FONT, fontWeight: 800, color: C.text, pt: 3 }}>Discount Exceeded</DialogTitle>
           <DialogContent sx={{ pt: 1 }}>
             <Typography variant="body2" sx={{ fontFamily: FONT, color: C.mutedDark, mb: 1 }}>
@@ -1016,9 +1020,9 @@ export default function OrderLines({
           <DialogActions sx={{ px: 3, pb: 3, gap: 1.5 }}>
             <Button onClick={() => setShowExceededDialog(false)} sx={{ color: '#666', fontFamily: FONT, textTransform: 'none', borderRadius: R.pill, px: 3 }}>Cancel</Button>
             {!isCCManager ? (
-              <Button startIcon={<GppMaybeIcon />} onClick={askDiscountPermission} sx={{ backgroundColor: C.teal, color: 'white', fontFamily: FONT, textTransform: 'none', borderRadius: R.pill, px: 4, boxShadow: `0 6px 18px ${alpha(C.teal, 0.28)}`, '&:hover': { backgroundColor: '#17b891' } }}>Ask Permission</Button>
+              <Button startIcon={<GppMaybeIcon />} onClick={askDiscountPermission} sx={{ backgroundColor: C.purple, color: 'white', fontFamily: FONT, textTransform: 'none', borderRadius: R.pill, px: 4, boxShadow: `0 6px 18px ${alpha(C.purple, 0.25)}`, '&:hover': { backgroundColor: C.red } }}>Ask Permission</Button>
             ) : (
-              <Button startIcon={<CheckCircleIcon />} onClick={() => applyDistributedDiscount(true)} sx={{ backgroundColor: C.red, color: 'white', fontFamily: FONT, textTransform: 'none', borderRadius: R.pill, px: 4, boxShadow: `0 6px 18px ${alpha(C.red, 0.28)}`, '&:hover': { backgroundColor: '#d32f2f' } }}>Allow</Button>
+              <Button startIcon={<CheckCircleIcon />} onClick={() => applyDistributedDiscount(true)} sx={{ backgroundColor: C.purple, color: 'white', fontFamily: FONT, textTransform: 'none', borderRadius: R.pill, px: 4, boxShadow: `0 6px 18px ${alpha(C.purple, 0.25)}`, '&:hover': { backgroundColor: C.red } }}>Allow</Button>
             )}
           </DialogActions>
         </Dialog>
