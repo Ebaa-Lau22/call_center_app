@@ -42,6 +42,7 @@ export default function OrderLinesReadOnly({
     ...l,
     id: l.id ?? l.product_id ?? l.product?.id,
     name: l.name ?? l.product_name ?? l.display_name ?? l.product?.name ?? '—',
+    code: l.code ?? l.default_code ?? l.product?.default_code ?? '—',
     qty: Number(l.qty ?? l.requested_qty ?? l.product_uom_qty ?? 1),
     price: Number(l.price ?? l.price_unit ?? 0),
     cost: Number(l.cost ?? l.cost_unit ?? 0),
@@ -112,6 +113,7 @@ export default function OrderLinesReadOnly({
                     <TableRow sx={{ backgroundColor: 'white' }}>
                       <TableCell sx={{ ...thSx, width: '52px', textAlign: 'center' }}>Image</TableCell>
                       <TableCell sx={{ ...thSx, minWidth: '130px' }}>Product</TableCell>
+                      <TableCell sx={{ ...thSx, width: '78px', textAlign: 'center' }}>SKU</TableCell>
                       <TableCell sx={{ ...thSx, width: '56px', textAlign: 'center' }}>Stock</TableCell>
                       <TableCell sx={{ ...thSx, width: '60px', textAlign: 'center' }}>In Prep</TableCell>
                       <TableCell sx={{ ...thSx, width: '60px', textAlign: 'center' }}>Qty</TableCell>
@@ -172,6 +174,11 @@ export default function OrderLinesReadOnly({
                               )}
                             </TableCell>
 
+                            {/* sku */}
+                            <TableCell sx={{ ...tdSx, textAlign: 'center', fontFamily: FONT, fontSize: '12px', color: C.mutedDark, fontWeight: 600, letterSpacing: '0.3px' }}>
+                              {isDelivery || isReward || isService ? <BlockIcon sx={{ fontSize: 14, color: alpha(C.muted, 0.5) }} /> : (line.code || '—')}
+                            </TableCell>
+                            
                             {/* stock */}
                             <TableCell sx={{ ...tdSx, textAlign: 'center', fontWeight: 600 }}>
                               {isServiceRow
@@ -235,7 +242,7 @@ export default function OrderLinesReadOnly({
                               <TableCell sx={{ p: '0 8px', textAlign: 'center', verticalAlign: 'middle' }}>
                                 <NotesIcon sx={{ fontSize: 14, color: '#b8b2c4', display: 'block', mx: 'auto' }} />
                               </TableCell>
-                              <TableCell colSpan={8} sx={{ p: 0, verticalAlign: 'middle' }}>
+                              <TableCell colSpan={9} sx={{ p: 0, verticalAlign: 'middle' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', minHeight: '30px', pl: '12px', pr: '8px' }}>
                                   <Typography sx={{ fontFamily: FONT, fontSize: '11.5px', color: '#666', lineHeight: '24px' }}>
                                     {productNotes[line.id]}

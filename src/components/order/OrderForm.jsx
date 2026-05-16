@@ -39,6 +39,9 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import ApartmentIcon from '@mui/icons-material/Apartment';
+import DomainIcon from '@mui/icons-material/Domain';
+import LayersIcon from '@mui/icons-material/Layers';
 import StoreIcon from '@mui/icons-material/Store';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SignpostIcon from '@mui/icons-material/Signpost';
@@ -134,7 +137,7 @@ export default function OrderForm() {
   // ─── state ─────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(isDraftOrder);
   const [loadError, setLoadError] = useState(null);
-  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', net_sale: '' });
+  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', block: '', building: '', floor: '', net_sale: '' });
   const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, orderName: '' });
   const [doctor, setDoctor] = useState({ id: '', doctor_name: '', doctor_phone: '', clinic_name: '' });
   const [doctorSearchResults, setDoctorSearchResults] = useState([]);
@@ -191,6 +194,9 @@ export default function OrderForm() {
             area: data.customer?.area || '',
             landmark: data.customer?.landmark || '',
             street: data.customer?.street || '',
+            block: data.customer?.block || '',
+            building: data.customer?.building || '',
+            floor: data.customer?.floor || '',
             net_sale: data.customer?.net_sale || '',
           });
           const cfg = data.order_config || {};
@@ -459,8 +465,7 @@ export default function OrderForm() {
     try {
       const customerResponse = await axios.post(
         '/api/call_center/customer/upsert',
-        { params: { customer_data: { name: customer.name, phone: customer.phone, area_id: customer.area, country_id: selectedCountryId, street: customer.street, landmark: customer.landmark } } },
-        { withCredentials: true }
+        { params: { customer_data: { name: customer.name, phone: customer.phone, area_id: customer.area, country_id: selectedCountryId, street: customer.street, landmark: customer.landmark, block: customer.block, building: customer.building, floor: customer.floor } } }, { withCredentials: true }
       );
       if (customerResponse.data.result.status !== 'success') { alert('Failed to save customer data: ' + customerResponse.data.result.message); return null; }
 
@@ -473,6 +478,9 @@ export default function OrderForm() {
           country_id: selectedCountryId,
           street: customer.street,
           landmark: customer.landmark,
+          block: customer.block,
+          building: customer.building,
+          floor: customer.floor,
           delivery_type_id: order.deliveryTypeId,
           delivery_method_id: order.deliveryMethodId,
           delivery_company_order_id: selectedMethodObj?.is_delivery_company ? order.deliveryCompanyOrderId : false,
@@ -573,7 +581,18 @@ export default function OrderForm() {
   const applyCustomerData = (customerData, location) => {
     const areaId = location?.area || '';
     const countryId = location?.country_id || customerData?.country_id || '';
-    setCustomer({ id: customerData.id || '', name: customerData.name || '', phone: customerData.phone || '', area: areaId, landmark: location?.landmark || '', street: location?.street || '', net_sale: customerData.net_sale || '' });
+    setCustomer({
+      id: customerData.id || '',
+      name: customerData.name || '',
+      phone: customerData.phone || '',
+      area: areaId,
+      landmark: location?.landmark || '',
+      street: location?.street || '',
+      block: location?.block || '',
+      building: location?.building || '',
+      floor: location?.floor || '',
+      net_sale: customerData.net_sale || '',
+    });
     if (countryId) setSelectedCountryId(String(countryId));
     if (areaId) {
       const selectedArea = areasData.find(a => String(a.id) === String(areaId));
@@ -742,6 +761,18 @@ export default function OrderForm() {
                     <Grid item xs={12} md={6}>
                       <TextField label="Street" value={customer.street} onChange={handleCustomerChange('street')} fullWidth size="medium" sx={formFieldSx}
                         InputProps={{ startAdornment: <SignpostIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField label="Block" value={customer.block} onChange={handleCustomerChange('block')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <ApartmentIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField label="Building" value={customer.building} onChange={handleCustomerChange('building')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <DomainIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField label="Floor" value={customer.floor} onChange={handleCustomerChange('floor')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <LayersIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <TextField label="Net Sale" value={customer.net_sale} fullWidth size="medium" disabled sx={formFieldDisabledSx}
@@ -932,7 +963,7 @@ export default function OrderForm() {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <LocationOnIcon sx={{ fontSize: { xs: 16, sm: 18 }, color: alpha('#000', 0.45) }} />
                             <Typography variant="body2" sx={{ fontFamily: FONT, color: '#5f5f5f', fontSize: { xs: '12px', sm: '13px' } }}>
-                              {[loc.area_name || loc.area, loc.street, loc.landmark].filter(Boolean).join(' • ') || 'No address details'}
+                              {[loc.area_name || loc.area, loc.street, loc.landmark, loc.block && `Block ${loc.block}`, loc.building && `Bldg ${loc.building}`, loc.floor && `Floor ${loc.floor}`].filter(Boolean).join(' • ') || 'No address details'}
                             </Typography>
                           </Box>
                         </Box>

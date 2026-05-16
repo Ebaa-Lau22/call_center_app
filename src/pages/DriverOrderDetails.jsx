@@ -415,6 +415,15 @@ export default function DriverAssignmentDetails() {
                       {order.customer_address?.street2 && (
                         <Typography sx={{ ...f, fontSize: 12, color: C.muted }}>{order.customer_address.street2}</Typography>
                       )}
+                      {(order.customer_address?.block || order.customer_address?.building || order.customer_address?.floor) && (
+                        <Typography sx={{ ...f, fontSize: 12, color: C.muted, mt: 0.15 }}>
+                          {[
+                            order.customer_address?.block && `Block ${order.customer_address.block}`,
+                            order.customer_address?.building && `Bldg ${order.customer_address.building}`,
+                            order.customer_address?.floor && `Floor ${order.customer_address.floor}`,
+                          ].filter(Boolean).join(' · ')}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
 

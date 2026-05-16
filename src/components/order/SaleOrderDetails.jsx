@@ -13,6 +13,9 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import ApartmentIcon from '@mui/icons-material/Apartment';
+import DomainIcon from '@mui/icons-material/Domain';
+import LayersIcon from '@mui/icons-material/Layers';
 import StoreIcon from '@mui/icons-material/Store';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SignpostIcon from '@mui/icons-material/Signpost';
@@ -106,9 +109,7 @@ export default function OrderDetailsReadOnly() {
   const [loadError, setLoadError] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-
-  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', net_sale: '' });
-  const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, state: '', orderName: '', alreadyPaidOnline: false });
+  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', block: '', building: '', floor: '', net_sale: '' });  const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, state: '', orderName: '', alreadyPaidOnline: false });
   const [doctor, setDoctor] = useState({ id: '', doctor_name: '', doctor_phone: '', clinic_name: '' });
   const [hasPrescription, setHasPrescription] = useState(false);
   const [termsAndConditions, setTermsAndConditions] = useState('');
@@ -186,7 +187,7 @@ export default function OrderDetailsReadOnly() {
         if (res.data.result.status !== 'success') { setLoadError('Failed to load order data'); return; }
         const data = res.data.result.result;
 
-        setCustomer({ id: data.customer?.id || '', name: data.customer?.name || '', phone: data.customer?.phone || '', area: data.customer?.area || '', landmark: data.customer?.landmark || '', street: data.customer?.street || '', net_sale: data.customer?.net_sale || '' });
+        setCustomer({ id: data.customer?.id || '', name: data.customer?.name || '', phone: data.customer?.phone || '', area: data.customer?.area || '', landmark: data.customer?.landmark || '', street: data.customer?.street || '', block: data.customer?.block || '', building: data.customer?.building || '', floor: data.customer?.floor || '', net_sale: data.customer?.net_sale || '' });
         const cfg = data.order_config || {};
         setOrder({
           deliveryTypeId: cfg.delivery_type_id || '',
@@ -231,8 +232,7 @@ export default function OrderDetailsReadOnly() {
     try {
       const custRes = await axios.post(
         '/api/call_center/customer/upsert',
-        { params: { customer_data: { name: customer.name, phone: customer.phone, area_id: customer.area, country_id: sessionCountryId, street: customer.street, landmark: customer.landmark } } },
-        { withCredentials: true }
+        { params: { customer_data: { name: customer.name, phone: customer.phone, area_id: customer.area, country_id: sessionCountryId, street: customer.street, landmark: customer.landmark, block: customer.block, building: customer.building, floor: customer.floor } } },        { withCredentials: true }
       );
       if (custRes.data.result.status !== 'success') { alert('Failed to save customer: ' + custRes.data.result.message); return null; }
       const partnerId = custRes.data.result.customer.id;
@@ -240,6 +240,8 @@ export default function OrderDetailsReadOnly() {
       const res = await axios.post('/api/call_center/update_order', {
         params: {
           order_id: orderId, company_id: companyId, partner_id: partnerId,
+          street: customer.street, landmark: customer.landmark,
+          block: customer.block, building: customer.building, floor: customer.floor,
           delivery_type_id: order.deliveryTypeId, delivery_method_id: order.deliveryMethodId,
           delivery_company_order_id: selectedMethodObj?.is_delivery_company ? order.deliveryCompanyOrderId : false,
           doctor_id: hasPrescription && doctor.id ? doctor.id : null,
@@ -468,6 +470,9 @@ export default function OrderDetailsReadOnly() {
                   <Grid item xs={12} md={6}><TextField label="Country" value={sessionCountry || ''} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <LocationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
                   <Grid item xs={12} md={6}><TextField label="Landmark" value={customer.landmark} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <LandscapeIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
                   <Grid item xs={12} md={6}><TextField label="Street" value={customer.street} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <SignpostIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
+                  <Grid item xs={12} md={4}><TextField label="Block" value={customer.block} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <ApartmentIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
+                  <Grid item xs={12} md={4}><TextField label="Building" value={customer.building} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <DomainIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
+                  <Grid item xs={12} md={4}><TextField label="Floor" value={customer.floor} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <LayersIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
                   <Grid item xs={12} md={6}><TextField label="Net Sale" value={customer.net_sale} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <MonetizationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
                 </Grid>
               </Box>

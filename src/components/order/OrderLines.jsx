@@ -169,8 +169,9 @@ export default function OrderLines({
 
   // stock dialog state
   const [stockDialogOpen, setStockDialogOpen] = useState(false);
-  const [stockDialogProduct, setStockDialogProduct] = useState({ name: '', qty_details: {} });
+  const [stockDialogProduct, setStockDialogProduct] = useState({ name: '', is_kit: false, qty_details: {} });
   const [stockDialogWh, setStockDialogWh] = useState(null);
+  const [stockDialogComponent, setStockDialogComponent] = useState(null);
 
   // ─── side effects ──────────────────────────────────────────────────────────
   useEffect(() => { onDeliveryChargeModeChange?.(deliveryChargeMode); }, [deliveryChargeMode]);
@@ -186,6 +187,7 @@ export default function OrderLines({
       cost: Number(l.cost ?? 0),
       currency: l.currency || currency_symbol,
       stock_qty: Number(l.stock_qty ?? 0),
+      is_kit: !!l.is_kit,
       in_prep_qty: Number(l.in_prep_qty ?? 0),
       discount_percent: isRewardId(l.id) || !!l.is_loyalty ? 100 : Number(l.discount ?? 0),
       isDeliveryCharge: isDeliveryId(l.id),
@@ -713,11 +715,12 @@ export default function OrderLines({
           <Fade in>
             <Box>
               <Box sx={{ backgroundColor: C.purpleBg, borderRadius: { xs: R.soft, sm: R.cardSm }, overflow: 'auto', border: '1px solid #e8e4f0', WebkitOverflowScrolling: 'touch' }}>
-                <Table sx={{ minWidth: '860px' }}>
+                <Table sx={{ minWidth: '938px' }}>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: 'white' }}>
                       <TableCell sx={{ ...thSx, width: '52px', textAlign: 'center' }}>Image</TableCell>
                       <TableCell sx={{ ...thSx, minWidth: '130px' }}>Product</TableCell>
+                      <TableCell sx={{ ...thSx, width: '78px', textAlign: 'center' }}>SKU</TableCell>
                       <TableCell sx={{ ...thSx, width: '56px', textAlign: 'center' }}>Stock</TableCell>
                       <TableCell sx={{ ...thSx, width: '60px', textAlign: 'center' }}>In Prep</TableCell>
                       <TableCell sx={{ ...thSx, width: '110px', textAlign: 'center' }}>Qty</TableCell>
@@ -764,6 +767,11 @@ export default function OrderLines({
                               </Box>
                             </TableCell>
 
+                            {/* sku */}
+                            <TableCell sx={{ ...tdSx, textAlign: 'center', fontFamily: FONT, fontSize: '12px', color: C.mutedDark, fontWeight: 600, letterSpacing: '0.3px' }}>
+                              {isService || line.isReward ? <BlockIcon sx={{ fontSize: 14, color: alpha(C.muted, 0.5) }} /> : (line.code || '—')}
+                            </TableCell>
+
                             {/* stock */}
                             <TableCell sx={{ ...tdSx, textAlign: 'center', fontWeight: 600 }}>
                               {isService ? (
@@ -771,8 +779,7 @@ export default function OrderLines({
                               ) : (
                                 <Box sx={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', pt: Object.keys(line.qty_details || {}).length > 0 ? 1 : 0 }}>
                                   {Object.keys(line.qty_details || {}).length > 0 && (
-                                    <IconButton size="small" onClick={() => { setStockDialogProduct({ name: line.name, qty_details: line.qty_details }); setStockDialogWh(null); setStockDialogOpen(true); }} sx={{ position: 'absolute', top: -6, right: -12, p: '2px', color: alpha(C.purple, 0.50), '&:hover': { color: C.purple } }}>
-                                      <InfoOutlinedIcon sx={{ fontSize: 11 }} />
+                                    <IconButton size="small" onClick={() => { setStockDialogProduct({ name: line.name, is_kit: !!line.is_kit, qty_details: line.qty_details }); setStockDialogWh(null); setStockDialogComponent(null); setStockDialogOpen(true); }} sx={{ position: 'absolute', top: -6, right: -12, p: '2px', color: alpha(C.purple, 0.50), '&:hover': { color: C.purple } }}>                                      <InfoOutlinedIcon sx={{ fontSize: 11 }} />
                                     </IconButton>
                                   )}
                                   <span>{line.stock_qty || 0}</span>
@@ -856,7 +863,7 @@ export default function OrderLines({
                               <TableCell sx={{ p: '0 8px', textAlign: 'center', verticalAlign: 'middle' }}>
                                 <NotesIcon sx={{ fontSize: 14, color: '#b8b2c4', display: 'block', mx: 'auto' }} />
                               </TableCell>
-                              <TableCell colSpan={9} sx={{ p: 0, verticalAlign: 'middle' }}>
+                              <TableCell colSpan={10} sx={{ p: 0, verticalAlign: 'middle' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', minHeight: '30px', pl: '12px', pr: '8px' }}>
                                   <textarea placeholder="Add a note…" value={localProductNotes[line.id] || ''} onChange={(e) => setLocalProductNotes(prev => ({ ...prev, [line.id]: e.target.value.slice(0, 200) }))} maxLength={200} style={{ flex: 1, border: 'none', backgroundColor: 'transparent', fontFamily: FONT, fontSize: '11.5px', color: '#666', outline: 'none', padding: '0', resize: 'none', height: '24px', lineHeight: '24px' }} />
                                 </Box>
@@ -1248,54 +1255,133 @@ export default function OrderLines({
         {/* stock detail dialog */}
         <Dialog open={stockDialogOpen} onClose={() => setStockDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '24px', p: 1, boxShadow: `0 18px 50px ${alpha(C.purple, 0.22)}`, border: `1px solid ${alpha(C.purple, 0.14)}`, overflow: 'hidden', position: 'relative', '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: `linear-gradient(90deg, ${C.purple}, #9575cd, ${C.purple})` } } }}>
           <DialogTitle sx={{ fontFamily: FONT, fontWeight: 700, color: C.text, pt: 3, display: 'flex', alignItems: 'center', gap: 1, pr: 6 }}>
-            {stockDialogWh ? (
-              <IconButton size="small" onClick={() => setStockDialogWh(null)} sx={{ mr: 0.5, color: C.purple, border: `1.5px solid ${alpha(C.purple, 0.30)}`, borderRadius: R.soft, p: '4px' }}><ArrowBackIcon fontSize="small" /></IconButton>
+            {(stockDialogWh || stockDialogComponent) ? (
+              <IconButton size="small" onClick={() => { if (stockDialogComponent) setStockDialogComponent(null); else setStockDialogWh(null); }} sx={{ mr: 0.5, color: C.purple, border: `1.5px solid ${alpha(C.purple, 0.30)}`, borderRadius: R.soft, p: '4px' }}><ArrowBackIcon fontSize="small" /></IconButton>
             ) : (
               <Box sx={{ width: 32, height: 32, borderRadius: R.soft, backgroundColor: alpha(C.purple, 0.12), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><InfoOutlinedIcon sx={{ color: C.purple, fontSize: 18 }} /></Box>
             )}
             <Box>
-              <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '15px', color: C.text, lineHeight: 1.2 }}>{stockDialogWh ?? 'Stock by Warehouse'}</Typography>
-              <Typography sx={{ fontFamily: FONT, fontSize: '12px', color: C.mutedDark, fontWeight: 400, mt: 0.2 }}>{stockDialogProduct.name}</Typography>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '15px', color: C.text, lineHeight: 1.2 }}>
+                {stockDialogComponent?.name ?? stockDialogWh ?? 'Stock by Warehouse'}
+              </Typography>
+              <Typography sx={{ fontFamily: FONT, fontSize: '12px', color: C.mutedDark, fontWeight: 400, mt: 0.2 }}>
+                {stockDialogComponent ? `${stockDialogProduct.name} · ${stockDialogWh}` : stockDialogProduct.name}
+              </Typography>
             </Box>
             <IconButton size="small" onClick={() => setStockDialogOpen(false)} sx={{ position: 'absolute', right: 14, top: 14, color: C.muted }}><CloseIcon fontSize="small" /></IconButton>
           </DialogTitle>
           <DialogContent sx={{ pt: 0.5, pb: 2 }}>
-            {!stockDialogWh ? (
-              <Box sx={{ borderRadius: R.cardSm, overflow: 'hidden', border: `1px solid ${alpha(C.purple, 0.16)}` }}>
-                <Table size="small">
-                  <TableHead><TableRow sx={{ backgroundColor: alpha(C.purple, 0.06) }}>{['Warehouse', 'Qty', 'Lots', ''].map((h, i) => <TableCell key={i} sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '12px', color: C.mutedDark, borderBottom: `1px solid ${alpha(C.purple, 0.12)}`, py: 0.75, ...(i === 3 ? { width: '36px' } : {}) }}>{h}</TableCell>)}</TableRow></TableHead>
-                  <TableBody>
-                    {Object.entries(stockDialogProduct.qty_details || {}).map(([whName, whData], idx, arr) => {
-                      const lots = whData.lots || {}; const whQty = whData.wh_qty ?? 0;
-                      return <TableRow key={whName} onClick={() => setStockDialogWh(whName)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: alpha(C.purple, 0.04) }, borderBottom: idx < arr.length - 1 ? `1px solid ${alpha(C.purple, 0.08)}` : 'none' }}>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '13px', color: C.text, fontWeight: 600, border: 'none' }}>{whName}</TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '13px', color: C.purple, fontWeight: 700, textAlign: 'center', border: 'none' }}>{whQty}</TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '13px', color: C.mutedDark, textAlign: 'center', border: 'none' }}>{Object.keys(lots).length}</TableCell>
-                        <TableCell align="right" sx={{ border: 'none' }}><ChevronRightIcon sx={{ fontSize: 18, color: alpha(C.purple, 0.45) }} /></TableCell>
-                      </TableRow>;
-                    })}
-                    {Object.keys(stockDialogProduct.qty_details || {}).length === 0 && <TableRow><TableCell colSpan={4} align="center" sx={{ fontFamily: FONT, fontSize: '13px', color: C.muted, py: 3, border: 'none' }}>No warehouse data available</TableCell></TableRow>}
-                  </TableBody>
-                </Table>
-              </Box>
-            ) : (
-              <Box sx={{ borderRadius: R.cardSm, overflow: 'hidden', border: `1px solid ${alpha(C.purple, 0.16)}` }}>
-                <Table size="small">
-                  <TableHead><TableRow sx={{ backgroundColor: alpha(C.purple, 0.06) }}>{['Serial No.', 'Qty', 'Expiry Date', 'Removal Date'].map(h => <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '12px', color: C.mutedDark, borderBottom: `1px solid ${alpha(C.purple, 0.12)}` }}>{h}</TableCell>)}</TableRow></TableHead>
-                  <TableBody>
-                    {Object.values((stockDialogProduct.qty_details[stockDialogWh] || {}).lots || {}).map((lot, i, arr) => (
-                      <TableRow key={i} sx={{ '&:hover': { backgroundColor: alpha(C.purple, 0.03) }, borderBottom: i < arr.length - 1 ? `1px solid ${alpha(C.purple, 0.08)}` : 'none' }}>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '12px', color: C.text, fontWeight: 600, border: 'none' }}>{lot.serial_number || '—'}</TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '12px', color: C.purple, fontWeight: 700, textAlign: 'center', border: 'none' }}>{lot.lot_qty ?? '—'}</TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '12px', color: C.mutedDark, border: 'none' }}>{lot.expiration_date || '—'}</TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '12px', color: C.mutedDark, border: 'none' }}>{lot.removal_date || '—'}</TableCell>
+            {(() => {
+              const isKit = !!stockDialogProduct.is_kit;
+              const thBase = { fontFamily: FONT, fontWeight: 600, fontSize: '12px', color: C.mutedDark, borderBottom: `1px solid ${alpha(C.purple, 0.12)}`, py: 0.75, textAlign: 'center' };
+              const tdBase = { fontFamily: FONT, fontSize: '13px', border: 'none', textAlign: 'center' };
+
+              // ── Level 1: warehouses
+              if (!stockDialogWh) {
+                const secondColLabel = isKit ? 'Components' : 'Lots';
+                return (
+                  <Box sx={{ borderRadius: R.cardSm, overflow: 'hidden', border: `1px solid ${alpha(C.purple, 0.16)}` }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: alpha(C.purple, 0.06) }}>
+                          <TableCell sx={{ ...thBase, textAlign: 'left' }}>Warehouse</TableCell>
+                          <TableCell sx={thBase}>Qty</TableCell>
+                          <TableCell sx={thBase}>{secondColLabel}</TableCell>
+                          <TableCell sx={{ ...thBase, width: '36px' }} />
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {Object.entries(stockDialogProduct.qty_details || {}).map(([whName, whData], idx, arr) => {
+                          const lots = whData.lots || {};
+                          const components = whData.components || [];
+                          const whQty = whData.wh_qty ?? 0;
+                          const secondColValue = isKit ? components.length : Object.keys(lots).length;
+                          return (
+                            <TableRow key={whName} onClick={() => setStockDialogWh(whName)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: alpha(C.purple, 0.04) }, borderBottom: idx < arr.length - 1 ? `1px solid ${alpha(C.purple, 0.08)}` : 'none' }}>
+                              <TableCell sx={{ ...tdBase, textAlign: 'left', color: C.text, fontWeight: 600 }}>{whName}</TableCell>
+                              <TableCell sx={{ ...tdBase, color: C.purple, fontWeight: 700 }}>{whQty}</TableCell>
+                              <TableCell sx={{ ...tdBase, color: C.mutedDark }}>{secondColValue}</TableCell>
+                              <TableCell sx={{ border: 'none', textAlign: 'right' }}><ChevronRightIcon sx={{ fontSize: 18, color: alpha(C.purple, 0.45) }} /></TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {Object.keys(stockDialogProduct.qty_details || {}).length === 0 && (
+                          <TableRow><TableCell colSpan={4} sx={{ ...tdBase, color: C.muted, py: 3 }}>No warehouse data available</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                );
+              }
+
+              const whData = stockDialogProduct.qty_details[stockDialogWh] || {};
+
+              // ── Level 2 (kit): components inside the chosen warehouse
+              if (isKit && !stockDialogComponent) {
+                const components = whData.components || [];
+                return (
+                  <Box sx={{ borderRadius: R.cardSm, overflow: 'hidden', border: `1px solid ${alpha(C.purple, 0.16)}` }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: alpha(C.purple, 0.06) }}>
+                          <TableCell sx={{ ...thBase, textAlign: 'left' }}>Component</TableCell>
+                          <TableCell sx={thBase}>Per Kit</TableCell>
+                          <TableCell sx={thBase}>Available</TableCell>
+                          <TableCell sx={thBase}>Lots</TableCell>
+                          <TableCell sx={{ ...thBase, width: '36px' }} />
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {components.map((c, i, arr) => {
+                          const lotsCount = Object.keys(c.lots || {}).length;
+                          return (
+                            <TableRow key={c.product_id} onClick={() => setStockDialogComponent(c)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: alpha(C.purple, 0.04) }, borderBottom: i < arr.length - 1 ? `1px solid ${alpha(C.purple, 0.08)}` : 'none' }}>
+                              <TableCell sx={{ ...tdBase, textAlign: 'left', color: C.text, fontWeight: 600 }}>{c.name}</TableCell>
+                              <TableCell sx={{ ...tdBase, color: C.mutedDark }}>{c.required_per_kit}</TableCell>
+                              <TableCell sx={{ ...tdBase, color: C.purple, fontWeight: 700 }}>{c.available_qty}</TableCell>
+                              <TableCell sx={{ ...tdBase, color: C.mutedDark }}>{lotsCount}</TableCell>
+                              <TableCell sx={{ border: 'none', textAlign: 'right' }}><ChevronRightIcon sx={{ fontSize: 18, color: alpha(C.purple, 0.45) }} /></TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {components.length === 0 && (
+                          <TableRow><TableCell colSpan={5} sx={{ ...tdBase, color: C.muted, py: 3 }}>No component data for this warehouse</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                );
+              }
+
+              // ── Level 3 (kit) OR Level 2 (regular): lots
+              const lotsSource = isKit ? (stockDialogComponent?.lots || {}) : (whData.lots || {});
+              return (
+                <Box sx={{ borderRadius: R.cardSm, overflow: 'hidden', border: `1px solid ${alpha(C.purple, 0.16)}` }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: alpha(C.purple, 0.06) }}>
+                        {['Serial No.', 'Qty', 'Expiry Date', 'Removal Date'].map(h => (
+                          <TableCell key={h} sx={thBase}>{h}</TableCell>
+                        ))}
                       </TableRow>
-                    ))}
-                    {Object.keys((stockDialogProduct.qty_details[stockDialogWh] || {}).lots || {}).length === 0 && <TableRow><TableCell colSpan={4} align="center" sx={{ fontFamily: FONT, fontSize: '12px', color: C.muted, py: 3, border: 'none' }}>No lot data for this warehouse</TableCell></TableRow>}
-                  </TableBody>
-                </Table>
-              </Box>
-            )}
+                    </TableHead>
+                    <TableBody>
+                      {Object.values(lotsSource).map((lot, i, arr) => (
+                        <TableRow key={i} sx={{ '&:hover': { backgroundColor: alpha(C.purple, 0.03) }, borderBottom: i < arr.length - 1 ? `1px solid ${alpha(C.purple, 0.08)}` : 'none' }}>
+                          <TableCell sx={{ ...tdBase, fontSize: '12px', color: C.text, fontWeight: 600 }}>{lot.serial_number || '—'}</TableCell>
+                          <TableCell sx={{ ...tdBase, fontSize: '12px', color: C.purple, fontWeight: 700 }}>{lot.lot_qty ?? '—'}</TableCell>
+                          <TableCell sx={{ ...tdBase, fontSize: '12px', color: C.mutedDark }}>{lot.expiration_date || '—'}</TableCell>
+                          <TableCell sx={{ ...tdBase, fontSize: '12px', color: C.mutedDark }}>{lot.removal_date || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                      {Object.keys(lotsSource).length === 0 && (
+                        <TableRow><TableCell colSpan={4} sx={{ ...tdBase, fontSize: '12px', color: C.muted, py: 3 }}>No lot data for this warehouse</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </Box>
+              );
+            })()}
           </DialogContent>
         </Dialog>
 

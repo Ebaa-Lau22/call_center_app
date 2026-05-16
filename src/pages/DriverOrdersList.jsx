@@ -290,7 +290,11 @@ export default function DriverAssignmentsList() {
                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.2 }}>
                               <LocationOnIcon sx={{ fontSize: 13, color: T, flexShrink: 0 }} />
                               <Typography sx={{ ...f, fontSize: 12, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {firstOrder.customer_address?.area}
+                                {[
+                                  firstOrder.customer_address?.area,
+                                  firstOrder.customer_address?.building && `Bldg ${firstOrder.customer_address.building}`,
+                                  firstOrder.customer_address?.floor && `Fl ${firstOrder.customer_address.floor}`,
+                                ].filter(Boolean).join(' · ')}
                               </Typography>
                             </Box>
                           </Box>

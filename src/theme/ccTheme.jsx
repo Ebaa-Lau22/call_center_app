@@ -4,7 +4,7 @@ import { alpha, Box, CircularProgress } from '@mui/material';
 export const C = {
   purple:     '#7e57c2',
   purpleDark: '#5a3f8f',
-  purpleBg:   '#faf9fc',
+  purpleBg:   '#fbfafd',
   pink:       '#ec407a',
   teal:       '#1dd1a1',
   tealDark:   '#17b891',
