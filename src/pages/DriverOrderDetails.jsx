@@ -10,7 +10,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PhoneIcon from "@mui/icons-material/Phone";
 import PaymentsIcon from "@mui/icons-material/Payments";
-import PaymentIcon from "@mui/icons-material/Payment"; 
+import PaymentIcon from "@mui/icons-material/Payment";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import StoreIcon from "@mui/icons-material/Store";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
@@ -18,6 +18,7 @@ import AssignmentReturnIcon from "@mui/icons-material/AssignmentReturn";
 import NotesIcon from "@mui/icons-material/Notes";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonIcon from "@mui/icons-material/Person";
+import BlockIcon from "@mui/icons-material/Block";
 import axios from "axios";
 import { C, FONT, R, bannerGradient, AppLoader } from "../theme/ccTheme";
 
@@ -156,6 +157,7 @@ export default function DriverAssignmentDetails() {
 
   const order = assignment?.orders?.[0];
   const paidOnline = !!order?.already_paid_online;
+  const blacklisted = !!order?.customer_blacklisted;
   const hasDiscount = (order?.amount_discount || 0) > 0;
 
   const canAct = assignment?.state === "waiting_for_approve";
@@ -491,6 +493,21 @@ export default function DriverAssignmentDetails() {
 
                 {/* customer — textured with purple icon row */}
                 <Card sx={{ backgroundImage: `radial-gradient(circle at 100% 0%, ${alpha(P, 0.03)} 0%, transparent 60%)` }}>
+                  {blacklisted && (
+                    <Box sx={{
+                      display: "flex", alignItems: "center", gap: 1,
+                      px: 1.2, py: 0.9, mb: 1.2,
+                      borderRadius: R.soft,
+                      border: `1px solid ${alpha(C.red, 0.30)}`,
+                      backgroundColor: alpha(C.red, 0.05),
+                    }}>
+                      <BlockIcon sx={{ fontSize: 16, color: C.red, flexShrink: 0 }} />
+                      <Box>
+                        <Typography sx={{ ...f, fontSize: 12, color: C.red }}>Blacklisted customer</Typography>
+                        <Typography sx={{ ...f, fontSize: 11, color: alpha(C.red, 0.85) }}>Collect payment before handing over the order.</Typography>
+                      </Box>
+                    </Box>
+                  )}
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
                     <PersonIcon sx={{ color: P, fontSize: 18 }} />
                     <SLabel>Customer</SLabel>

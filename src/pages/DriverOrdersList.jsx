@@ -235,6 +235,7 @@ export default function DriverAssignmentsList() {
                   const isPending = asgn.state === "waiting_for_approve";
                   const firstOrder = asgn.orders?.[0];
                   const paidOnline = !!firstOrder?.already_paid_online;
+                  const blacklisted = !!firstOrder?.customer_blacklisted;
                   const totalAmount = asgn.orders?.reduce((s, o) => s + o.amount_total, 0) || 0;
 
                   return (
@@ -243,8 +244,10 @@ export default function DriverAssignmentsList() {
                       onClick={() => navigate(`/driver/orders/${asgn.id}`)}
                       sx={{
                         borderRadius: R.cardSm,
-                        backgroundColor: "white",
-                        border: paidOnline ? `1.5px solid ${alpha(T, 0.28)}` : "1px solid rgba(126,87,194,0.08)",
+                        border: paidOnline
+                          ? `1.5px solid ${alpha(T, 0.28)}`
+                          : (blacklisted ? `1.5px solid ${alpha(C.red, 0.40)}` : "1px solid rgba(126,87,194,0.08)"),
+                        backgroundColor: !paidOnline && blacklisted ? alpha(C.red, 0.025) : "white",
                         boxShadow: "0 2px 8px rgba(126,87,194,0.06)",
                         p: isMobile ? 1.8 : 2,
                         cursor: "pointer",
