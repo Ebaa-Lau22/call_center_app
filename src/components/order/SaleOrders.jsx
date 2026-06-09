@@ -53,8 +53,11 @@ const getStatusColor = (state) => {
     in_preparation: { bg: '#fff3e0', color: '#ef6c00' },
     preparation_ended: { bg: '#e0f2f1', color: '#00897b' },
     confirmed: { bg: '#e8f5e9', color: '#2e7d32' },
+    waiting_for_approve: { bg: '#fff8e1', color: '#f9a825' },
+    delivery: { bg: '#faf6e0', color: '#8f8d00' },
     received: { bg: '#e8f5ef', color: C.teal },
     canceled: { bg: '#ffebee', color: '#c62828' },
+    rejected: { bg: '#fbe9e7', color: '#bf360c' },
     rejected_by_client: { bg: '#ead4d2', color: '#8c0e00' },
     partially_received: { bg: '#e8eaf6', color: '#283593' },
   };
@@ -300,6 +303,7 @@ export default function SaleOrders() {
                         <MenuItem value="all">All Fields</MenuItem>
                         <MenuItem value="phone">Phone</MenuItem>
                         <MenuItem value="name">Customer Name</MenuItem>
+                        <MenuItem value="salesperson">Salesperson</MenuItem>
                         <MenuItem value="area">Area</MenuItem>
                         <MenuItem value="reference">Reference</MenuItem>
                       </Select>
@@ -341,6 +345,7 @@ export default function SaleOrders() {
                         <MenuItem value="none">No Grouping</MenuItem>
                         <MenuItem value="customer_name">By Customer</MenuItem>
                         <MenuItem value="branch">By Branch</MenuItem>
+                        <MenuItem value="salesperson">By Salesperson</MenuItem>
                         <MenuItem value="day">By Day</MenuItem>
                         <MenuItem value="month">By Month</MenuItem>
                         <MenuItem value="year">By Year</MenuItem>
@@ -369,18 +374,18 @@ export default function SaleOrders() {
                 <Box sx={{ backgroundColor: 'white', borderRadius: '20px', overflow: 'hidden', boxShadow: `0 4px 24px ${alpha(P, 0.1)}`, border: `1px solid ${alpha(P, 0.07)}` }}>
                   <Table>
                     <TableHead>
-                      <TableRow sx={{ background: `linear-gradient(90deg, ${alpha(P, 0.05)} 0%, ${alpha(T, 0.04)} 100%)`, borderBottom: `2px solid ${alpha(P, 0.08)}` }}>
-                        {['Order Ref', 'Customer', 'Phone', 'Area', 'Order Date', 'Commit Date', 'Branch', 'Amount', 'Status']
-                          .filter((col) => {
-                            if (col === 'Customer' && groupBy === 'customer_name') return false;
-                            if (col === 'Branch' && groupBy === 'branch') return false;
-                            return true;
-                          })
-                          .map((col) => (
-                            <TableCell key={col} sx={{ fontWeight: 700, color: '#3a3a3a', fontFamily: FONT, fontSize: '12px', letterSpacing: '0.6px', textTransform: 'uppercase', py: 2 }}>
-                              {col}
-                            </TableCell>
-                          ))}
+                      <TableRow sx={{ backgroundColor: '#f2f1f7', borderBottom: `2px solid ${alpha(P, 0.12)}` }}>                        {['Order Ref', 'Customer', 'Phone', 'Area', 'Salesperson', 'Order Date', 'Commit Date', 'Branch', 'Amount', 'Status']
+                        .filter((col) => {
+                          if (col === 'Customer' && groupBy === 'customer_name') return false;
+                          if (col === 'Branch' && groupBy === 'branch') return false;
+                          if (col === 'Salesperson' && groupBy === 'salesperson') return false;
+                          return true;
+                        })
+                        .map((col) => (
+                          <TableCell key={col} sx={{ fontWeight: 700, color: '#3a3a3a', fontFamily: FONT, fontSize: '12px', letterSpacing: '0.6px', textTransform: 'uppercase', py: 2 }}>
+                            {col}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     </TableHead>
 
@@ -397,6 +402,7 @@ export default function SaleOrders() {
                             {groupBy !== 'customer_name' && <TableCell sx={{ fontFamily: FONT, color: '#2d2d2d', fontSize: '13.5px' }}>{row.customer_name}</TableCell>}
                             <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.phone || '-'}</TableCell>
                             <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.area || '-'}</TableCell>
+                            {groupBy !== 'salesperson' && <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.salesperson || '-'}</TableCell>}
                             <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.date)}</TableCell>
                             <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.commitment_date) || '-'}</TableCell>
                             {groupBy !== 'branch' && <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.branch || '-'}</TableCell>}
@@ -584,7 +590,7 @@ function GroupRow({ groupName, orders, renderStatus, onRowClick, groupBy }) {
   return (
     <>
       <TableRow sx={{ backgroundColor: alpha(P, 0.03), '&:hover': { backgroundColor: alpha(P, 0.05) } }}>
-        <TableCell colSpan={9} sx={{ py: 1.25 }}>
+        <TableCell colSpan={10} sx={{ py: 1.25 }}>
           <Box display="flex" alignItems="center">
             <IconButton size="small" onClick={() => setOpen(!open)} sx={{ color: P, transition: 'all 0.2s ease', borderRadius: '8px', '&:hover': { backgroundColor: alpha(P, 0.08) } }}>
               {open ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
@@ -596,7 +602,7 @@ function GroupRow({ groupName, orders, renderStatus, onRowClick, groupBy }) {
       </TableRow>
 
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={10}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ py: 1.5, px: 5, borderLeft: `2px solid ${alpha(P, 0.1)}` }}>
               <Table size="small">
@@ -607,6 +613,8 @@ function GroupRow({ groupName, orders, renderStatus, onRowClick, groupBy }) {
                       {groupBy !== 'customer_name' && <TableCell sx={{ fontFamily: FONT, color: '#2d2d2d', fontSize: '13px' }}>{row.customer_name}</TableCell>}
                       <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.phone || '-'}</TableCell>
                       <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.area || '-'}</TableCell>
+                      {groupBy !== 'salesperson' && <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.salesperson || '-'}</TableCell>}
+                      <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.date)}</TableCell>
                       <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.date)}</TableCell>
                       <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.commitment_date) || '-'}</TableCell>
                       {groupBy !== 'branch' && <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.branch || '-'}</TableCell>}

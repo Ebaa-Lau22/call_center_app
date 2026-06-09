@@ -206,7 +206,7 @@ export default function DriverAssignmentDetails() {
         const amounts = allM.reduce((a, m) => ({ ...a, [m.id]: "" }), {});
 
         if (paidOnline) {
-          const onlineM = methods.find((m) => m.is_online);
+          const onlineM = methods.find((m) => m.id === order?.online_payment_method_id) || methods.find((m) => m.is_online);
           if (onlineM) {
             enabled[onlineM.id] = true;
             amounts[onlineM.id] = String(order?.amount_total || 0);
@@ -405,6 +405,11 @@ export default function DriverAssignmentDetails() {
                 <Card>
                   <SLabel>Order</SLabel>
                   <Typography sx={{ ...f, fontSize: 15, color: C.text }}>{order.name}</Typography>
+                  {order.call_center_order_ref && (
+                    <Typography sx={{ ...f, fontSize: 12, color: C.muted, mt: 0.2 }}>
+                      Call Center Order: <Box component="span" sx={{ color: C.mutedDark, fontWeight: 600 }}>{order.call_center_order_ref}</Box>
+                    </Typography>
+                  )}
                   <Typography sx={{ ...f, fontSize: 13, color: C.muted, mt: 0.3, mb: 1.5 }}>{order.customer_name}</Typography>
 
                   <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", mb: order.branch_address ? 1.2 : 0 }}>

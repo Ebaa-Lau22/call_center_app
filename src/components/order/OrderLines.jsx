@@ -915,9 +915,9 @@ export default function OrderLines({
               <Box sx={{ mt: 3.5, pt: 3.5, borderTop: `2px solid ${alpha(C.purple, 0.15)}` }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                   <DescriptionIcon sx={{ color: C.purple, fontSize: { xs: 18, sm: 22 } }} />
-                  <Typography sx={{ fontWeight: 700, fontSize: { xs: '13px', sm: '15px' }, color: C.text, fontFamily: FONT }}>Terms & Conditions</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: { xs: '13px', sm: '15px' }, color: C.text, fontFamily: FONT }}>Driver Note</Typography>
                 </Box>
-                <TextField multiline rows={4} placeholder="Add terms and conditions for this order..." value={localTermsAndConditions} onChange={(e) => setLocalTermsAndConditions(e.target.value)} fullWidth sx={textAreaSx} />
+                  <TextField multiline rows={4} placeholder="Add a note for the driver..." value={localTermsAndConditions} onChange={(e) => setLocalTermsAndConditions(e.target.value)} fullWidth sx={textAreaSx} />
               </Box>
             </Box>
           </Fade>

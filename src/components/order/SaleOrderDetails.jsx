@@ -75,10 +75,13 @@ const STATUS_COLORS = {
   in_preparation: { bg: '#fff3e0', color: '#ef6c00' },
   preparation_ended: { bg: '#e0f2f1', color: '#00897b' },
   confirmed: { bg: '#e8f5e9', color: '#2e7d32' },
+  waiting_for_approve: { bg: '#fff8e1', color: '#f9a825' },
+  delivery: { bg: '#faf6e0', color: '#8f8d00' },
   received: { bg: '#e8f5ef', color: C.teal },
   canceled: { bg: '#ffebee', color: '#c62828' },
-  rejected_by_client: { bg: '#ead4d2', color: '#8c0e00' },   
-  partially_received: { bg: '#e8eaf6', color: '#283593' },   
+  rejected: { bg: '#fbe9e7', color: '#bf360c' },
+  rejected_by_client: { bg: '#ead4d2', color: '#8c0e00' },
+  partially_received: { bg: '#e8eaf6', color: '#283593' },
 };
 const getStatusColor = (s) => STATUS_COLORS[s] || { bg: '#f5f5f5', color: '#616161' };
 
@@ -109,7 +112,8 @@ export default function OrderDetailsReadOnly() {
   const [loadError, setLoadError] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', block: '', building: '', floor: '', net_sale: '' });  const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, state: '', orderName: '', alreadyPaidOnline: false });
+  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', block: '', building: '', floor: '', net_sale: '' });
+  const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, state: '', orderName: '', alreadyPaidOnline: false, salesperson: '' });
   const [doctor, setDoctor] = useState({ id: '', doctor_name: '', doctor_phone: '', clinic_name: '' });
   const [hasPrescription, setHasPrescription] = useState(false);
   const [termsAndConditions, setTermsAndConditions] = useState('');
@@ -118,6 +122,9 @@ export default function OrderDetailsReadOnly() {
   const [deliveryTypesData, setDeliveryTypesData] = useState([]);
   const [areasData, setAreasData] = useState([]);
   const [productNotes, setProductNotes] = useState({});
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [onlinePaymentMethodId, setOnlinePaymentMethodId] = useState('');
+  const [savingPaidOnline, setSavingPaidOnline] = useState(false);
 
   // ─── derived ───────────────────────────────────────────────────────────────
   const selectedTypeObj = useMemo(
@@ -177,6 +184,12 @@ export default function OrderDetailsReadOnly() {
     fetchMeta();
   }, [sessionCountryId]);
 
+  useEffect(() => {
+    axios.post('/api/call_center/payment_methods/online', { params: {} }, { withCredentials: true })
+      .then(r => { if (r.data.result?.status === 'success') setPaymentMethods(r.data.result.result); })
+      .catch(() => { });
+  }, []);
+
   // ─── fetch order ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!orderId) { setLoadError('Missing order id'); setLoading(false); return; }
@@ -199,10 +212,12 @@ export default function OrderDetailsReadOnly() {
           state: data.order_info?.state || '',
           orderName: data.order_info?.name || '',
           alreadyPaidOnline: !!data.order_info?.already_paid_online,
+          salesperson: data.order_info?.salesperson || '',
         });
         setDoctor({ id: cfg.doctor_id || '', doctor_name: cfg.doctor_name || '', doctor_phone: cfg.doctor_phone || '', clinic_name: cfg.clinic_name || '' });
         setHasPrescription(!!cfg.doctor_id);
         setTermsAndConditions(cfg.terms_and_conditions || '');
+        setOnlinePaymentMethodId(data.order_info?.online_payment_method_id || '');
 
         // normalise lines — prefix loyalty ids so OrderLinesReadOnly identifies them
         const rawLines = (data.lines || []).map(l => ({
@@ -232,7 +247,7 @@ export default function OrderDetailsReadOnly() {
     try {
       const custRes = await axios.post(
         '/api/call_center/customer/upsert',
-        { params: { customer_data: { name: customer.name, phone: customer.phone, area_id: customer.area, country_id: sessionCountryId, street: customer.street, landmark: customer.landmark, block: customer.block, building: customer.building, floor: customer.floor } } },        { withCredentials: true }
+        { params: { customer_data: { name: customer.name, phone: customer.phone, area_id: customer.area, country_id: sessionCountryId, street: customer.street, landmark: customer.landmark, block: customer.block, building: customer.building, floor: customer.floor } } }, { withCredentials: true }
       );
       if (custRes.data.result.status !== 'success') { alert('Failed to save customer: ' + custRes.data.result.message); return null; }
       const partnerId = custRes.data.result.customer.id;
@@ -275,6 +290,24 @@ export default function OrderDetailsReadOnly() {
       navigate('/orders');
     } catch { alert('Reset to draft failed.'); }
     finally { setBusyAction(false); }
+  };
+
+  const paidOnlineEditable = ['wait_for_discount_approval', 'not_prepared', 'in_preparation', 'preparation_ended', 'confirmed'].includes(state);
+
+  const savePaidOnline = async () => {
+    try {
+      setSavingPaidOnline(true);
+      const res = await axios.post('/api/call_center/order/set_paid_online', {
+        params: {
+          order_id: orderId,
+          already_paid_online: order.alreadyPaidOnline,
+          online_payment_method_id: order.alreadyPaidOnline ? onlinePaymentMethodId : false,
+        },
+      }, { withCredentials: true });
+      if (res.data.result?.status === 'success') alert('Payment info saved.');
+      else alert(res.data.result?.message || 'Failed to save.');
+    } catch { alert('Failed to save payment info.'); }
+    finally { setSavingPaidOnline(false); }
   };
 
   const approveDiscount = async () => {
@@ -341,6 +374,9 @@ export default function OrderDetailsReadOnly() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 {order.orderName && (
                   <Chip label={order.orderName} sx={{ backgroundColor: alpha(C.purple, 0.10), color: C.purple, fontFamily: FONT, fontWeight: 600, fontSize: '13px', height: '28px', borderRadius: R.pill }} />
+                )}
+                {order.salesperson && (
+                  <Chip label={order.salesperson} sx={{ backgroundColor: alpha(C.teal, 0.10), color: C.teal, fontFamily: FONT, fontWeight: 600, fontSize: '13px', height: '28px', borderRadius: R.pill }} />
                 )}
                 {state && (
                   <Chip
@@ -439,15 +475,38 @@ export default function OrderDetailsReadOnly() {
                   </Typography>
                 </Box>
 
-                {/* paid online — read-only */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 1.5, borderRadius: R.pill, userSelect: 'none', border: `1.5px solid ${order.alreadyPaidOnline ? alpha(C.teal, 0.50) : '#e8e4f0'}`, backgroundColor: order.alreadyPaidOnline ? alpha(C.teal, 0.06) : 'white', flexShrink: 0 }}>
-                  <PaymentIcon sx={{ fontSize: 20, color: order.alreadyPaidOnline ? C.teal : C.muted }} />
-                  <Box>
-                    <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '13px', color: order.alreadyPaidOnline ? C.teal : C.mutedDark, lineHeight: 1.2 }}>Paid Online</Typography>
-                    <Typography sx={{ fontFamily: FONT, fontSize: '11px', color: C.muted }}>{order.alreadyPaidOnline ? 'Yes' : 'No'}</Typography>
+                {/* paid online */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <Box onClick={() => paidOnlineEditable && setOrder(o => ({ ...o, alreadyPaidOnline: !o.alreadyPaidOnline }))}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.65, borderRadius: R.pill, cursor: paidOnlineEditable ? 'pointer' : 'default', userSelect: 'none', border: `1.5px solid ${order.alreadyPaidOnline ? alpha(C.teal, 0.50) : '#e8e4f0'}`, backgroundColor: order.alreadyPaidOnline ? alpha(C.teal, 0.06) : 'white' }}>
+                    <PaymentIcon sx={{ fontSize: 17, color: order.alreadyPaidOnline ? C.teal : C.muted }} />
+                    <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '12px', color: order.alreadyPaidOnline ? C.teal : C.mutedDark }}>Paid Online</Typography>
+                    <Switch checked={order.alreadyPaidOnline} disabled={!paidOnlineEditable} size="small"
+                      onChange={(e) => setOrder(o => ({ ...o, alreadyPaidOnline: e.target.checked }))}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.teal }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.teal } }} />
                   </Box>
-                  <Switch checked={order.alreadyPaidOnline} disabled size="small"
-                    sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.teal }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.teal } }} />
+                  {order.alreadyPaidOnline && (
+                    <TextField
+                      select
+                      size="small"
+                      label="Method"
+                      value={onlinePaymentMethodId || ''}
+                      disabled={!paidOnlineEditable}
+                      onChange={(e) => setOnlinePaymentMethodId(e.target.value)}
+                      SelectProps={sharedMenuProps}
+                      sx={!paidOnlineEditable ? { ...formFieldDisabledSx, minWidth: 170 } : { ...formFieldSx, minWidth: 170 }}
+                    >
+                      {paymentMethods.length
+                        ? paymentMethods.map(m => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)
+                        : <MenuItem disabled>No online methods</MenuItem>}
+                    </TextField>
+                  )}
+                  {paidOnlineEditable && (
+                    <Button onClick={savePaidOnline} disabled={savingPaidOnline || (order.alreadyPaidOnline && !onlinePaymentMethodId)}
+                      sx={{ backgroundColor: C.teal, color: 'white', borderRadius: R.pill, px: 2, py: 0.7, fontWeight: 700, fontSize: '12px', fontFamily: FONT, textTransform: 'none', boxShadow: `0 4px 12px ${alpha(C.teal, 0.28)}`, '&:hover': { backgroundColor: C.tealDark }, '&.Mui-disabled': { backgroundColor: alpha(C.teal, 0.4), color: 'white' } }}>
+                      Save
+                    </Button>
+                  )}
                 </Box>
               </Box>
 

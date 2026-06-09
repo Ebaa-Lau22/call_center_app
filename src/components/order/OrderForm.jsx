@@ -138,8 +138,8 @@ export default function OrderForm() {
   // ─── state ─────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(isDraftOrder);
   const [loadError, setLoadError] = useState(null);
-  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', block: '', building: '', floor: '', net_sale: '', blacklist: false }); const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, orderName: '' });
-  const [doctor, setDoctor] = useState({ id: '', doctor_name: '', doctor_phone: '', clinic_name: '' });
+  const [customer, setCustomer] = useState({ id: '', name: '', phone: '', area: '', landmark: '', street: '', block: '', building: '', floor: '', net_sale: '', blacklist: false });
+  const [order, setOrder] = useState({ deliveryTypeId: '', deliveryMethodId: '', deliveryCompanyOrderId: '', branch: '', scheduledDate: nowLocalDatetime(), deliveryCharge: 0, orderName: '', salesperson: '' }); const [doctor, setDoctor] = useState({ id: '', doctor_name: '', doctor_phone: '', clinic_name: '' });
   const [doctorSearchResults, setDoctorSearchResults] = useState([]);
   const [orderLinesData, setOrderLinesData] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
@@ -162,6 +162,8 @@ export default function OrderForm() {
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [productNotes, setProductNotes] = useState({});
   const [alreadyPaidOnline, setAlreadyPaidOnline] = useState(false);
+  const [onlinePaymentMethodId, setOnlinePaymentMethodId] = useState('');
+  const [onlinePaymentMethods, setOnlinePaymentMethods] = useState([]);
   const [appliedLoyalties, setAppliedLoyalties] = useState([]);
 
   const doctorSearchRef = useRef(null);
@@ -209,6 +211,7 @@ export default function OrderForm() {
             scheduledDate: utcOdooToLocal(data.order_info?.commitment_date) || nowLocalDatetime(),
             deliveryCharge: cfg.branch_delivery_charge || 0,
             orderName: data.order_info?.name || '',
+            salesperson: data.order_info?.salesperson || '',
           });
           setDoctor({ id: cfg.doctor_id || '', doctor_name: cfg.doctor_name || '', doctor_phone: cfg.doctor_phone || '', clinic_name: cfg.clinic_name || '' });
           setTermsAndConditions(cfg.terms_and_conditions || '');
@@ -216,6 +219,7 @@ export default function OrderForm() {
           setDeliveryCharge(cfg.branch_delivery_charge || 0);
           setDeliveryChargeMode(cfg.delivery_charge_option || 'auto');
           setAlreadyPaidOnline(!!data.order_info?.already_paid_online);
+          setOnlinePaymentMethodId(data.order_info?.online_payment_method_id || '');
           setSelectedCountryId(data.order_info?.country_id || sessionCountryId || '');
           setAppliedLoyalties(data.applied_loyalties || []);
 
@@ -274,6 +278,12 @@ export default function OrderForm() {
       if (response.data.result?.status === 'success') setAreasData(response.data.result?.result || []);
     } catch { setAreasData([]); }
   };
+
+  useEffect(() => {
+    axios.post('/api/call_center/payment_methods/online', { params: {} }, { withCredentials: true })
+      .then(r => { if (r.data.result?.status === 'success') setOnlinePaymentMethods(r.data.result.result); })
+      .catch(() => { });
+  }, []);
 
   useEffect(() => {
     const fetchDeliveryTypes = async () => {
@@ -493,6 +503,7 @@ export default function OrderForm() {
           deliveryChargeMode: deliveryChargeMode,
           terms_and_conditions: termsAndConditions,
           already_paid_online: alreadyPaidOnline,
+          online_payment_method_id: alreadyPaidOnline ? onlinePaymentMethodId : false,
           state,
           lines: transformLinesToBackend(lines),
           applied_loyalties: appliedLoyalties.map(a => ({
@@ -652,13 +663,14 @@ export default function OrderForm() {
             <Box>
               {/* top bar: back button + chips (same layout as order details) */}
               <Box sx={{ mb: { xs: 3, sm: 4 }, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>                <Button startIcon={<ArrowBackIcon />} onClick={handleBack}
-                  sx={{ color: C.purple, fontFamily: FONT, fontWeight: 500, textTransform: 'none', fontSize: { xs: '13px', sm: '15px' }, '&:hover': { backgroundColor: alpha(C.purple, 0.08) } }}>
-                  Back to Orders
-                </Button>
+                sx={{ color: C.purple, fontFamily: FONT, fontWeight: 500, textTransform: 'none', fontSize: { xs: '13px', sm: '15px' }, '&:hover': { backgroundColor: alpha(C.purple, 0.08) } }}>
+                Back to Orders
+              </Button>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   {isDraftOrder && order.orderName && (
                     <Chip label={order.orderName} sx={{ backgroundColor: alpha(C.purple, 0.10), color: C.purple, fontFamily: FONT, fontWeight: 600, fontSize: '13px', height: '28px', borderRadius: R.pill }} />
                   )}
+                  <Chip label={isNewOrder ? (userData?.name || '') : order.salesperson} sx={{ backgroundColor: alpha(C.teal, 0.10), color: C.teal, fontFamily: FONT, fontWeight: 600, fontSize: '13px', height: '28px', borderRadius: R.pill }} />
                   <Chip
                     label={isNewOrder ? 'New Order' : 'Draft'}
                     sx={isNewOrder
@@ -704,254 +716,261 @@ export default function OrderForm() {
                         </Box>
                       </Box>
                     )}
-                    <Box
-                      onClick={() => setAlreadyPaidOnline(v => !v)}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 1.5, borderRadius: R.pill, cursor: 'pointer', userSelect: 'none', border: `1.5px solid ${alreadyPaidOnline ? alpha(C.teal, 0.50) : '#e8e4f0'}`, backgroundColor: alreadyPaidOnline ? alpha(C.teal, 0.06) : 'white', transition: 'all 0.2s ease', flexShrink: 0 }}>
-                      <PaymentIcon sx={{ fontSize: 20, color: alreadyPaidOnline ? C.teal : C.muted, transition: 'color 0.2s' }} />
-                      <Box>
-                        <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '13px', color: alreadyPaidOnline ? C.teal : C.mutedDark, lineHeight: 1.2, transition: 'color 0.2s' }}>Paid Online</Typography>
-                        <Typography sx={{ fontFamily: FONT, fontSize: '11px', color: C.muted }}>{alreadyPaidOnline ? 'Yes' : 'No'}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                      <Box onClick={() => setAlreadyPaidOnline(v => !v)}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.65, borderRadius: R.pill, cursor: 'pointer', userSelect: 'none', border: `1.5px solid ${alreadyPaidOnline ? alpha(C.teal, 0.50) : '#e8e4f0'}`, backgroundColor: alreadyPaidOnline ? alpha(C.teal, 0.06) : 'white', transition: 'all 0.2s ease' }}>
+                        <PaymentIcon sx={{ fontSize: 17, color: alreadyPaidOnline ? C.teal : C.muted }} />
+                        <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '12px', color: alreadyPaidOnline ? C.teal : C.mutedDark }}>Paid Online</Typography>
+                        <Switch checked={alreadyPaidOnline} onChange={(e) => { e.stopPropagation(); setAlreadyPaidOnline(e.target.checked); }} size="small"
+                          sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.teal }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.teal } }} />
                       </Box>
-                      <Switch checked={alreadyPaidOnline} onChange={(e) => { e.stopPropagation(); setAlreadyPaidOnline(e.target.checked); }} size="small"
-                        sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: C.teal }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.teal } }} />
-                    </Box>
-                  </Box>
-
-                  {/* ── Customer Details ── */}
-                  <Box sx={{
-                    mb: 5,
-                    ...(customer.blacklist && {
-                      p: { xs: 2, sm: 2.5 },
-                      borderRadius: R.cardSm,
-                      border: `1.5px solid ${alpha(C.red, 0.30)}`,
-                      backgroundColor: alpha(C.red, 0.03),
-                    }),
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
-                      <PersonIcon sx={{ color: C.purple, fontSize: { xs: 20, sm: 24 } }} />
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: C.purple, fontFamily: FONT, fontSize: { xs: '15px', sm: '18px' } }}>Customer Details</Typography>
-                    </Box>
-                    <Grid container spacing={{ xs: 2, sm: 3 }}>
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ position: 'relative' }}>
-                          <TextField label="Phone Number" value={customer.phone} onChange={handleCustomerChange('phone')} fullWidth size="medium" sx={formFieldSx}
-                            InputProps={{ startAdornment: <PhoneIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                          {searchResults.length > 0 && (
-                            <List sx={{ position: 'absolute', zIndex: 10, backgroundColor: 'white', width: '100%', maxHeight: 200, overflowY: 'auto', border: '1.5px solid #e8e4f0', borderRadius: R.cardSm, mt: 1, boxShadow: '0 8px 24px rgba(126, 87, 194, 0.15)' }}>
-                              {searchResults.map((c, index) => (
-                                <ListItem key={index} disablePadding>
-                                  <ListItemButton onClick={() => selectCustomer(c)} sx={{ fontFamily: FONT, py: { xs: 1, sm: 1.25 }, '&:hover': { backgroundColor: alpha(C.purple, 0.06), transform: 'translateX(4px)' } }}>
-                                    <ListItemText primary={`${c.phone} - ${c.name}`} secondary={c.locations?.length > 1 ? `${c.locations.length} locations` : ''}
-                                      primaryTypographyProps={{ fontFamily: FONT, fontSize: { xs: '13px', sm: '14px' } }}
-                                      secondaryTypographyProps={{ fontFamily: FONT, color: C.purple, fontWeight: 500, fontSize: { xs: '12px', sm: '13px' } }} />
-                                  </ListItemButton>
-                                </ListItem>
-                              ))}
-                            </List>
-                          )}
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Customer Name" value={customer.name} onChange={handleCustomerChange('name')} fullWidth size="medium" sx={formFieldSx}
-                          InputProps={{ startAdornment: <PersonIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField select label="Area" value={customer.area || ''} onChange={handleAreaChange} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}
-                          InputProps={{ startAdornment: <LocationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }}>
-                          {areasData.length > 0 ? areasData.map(area => <MenuItem key={area.id} value={area.id}>{area.name}</MenuItem>) : <MenuItem disabled>No areas available</MenuItem>}
+                      {alreadyPaidOnline && (
+                        <TextField select size="small" label="Method" value={onlinePaymentMethodId || ''}
+                          onChange={(e) => setOnlinePaymentMethodId(e.target.value)} SelectProps={sharedMenuProps}
+                          sx={{ ...formFieldSx, minWidth: 170 }}>
+                          {onlinePaymentMethods.length
+                            ? onlinePaymentMethods.map(m => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)
+                            : <MenuItem disabled>No online methods</MenuItem>}
                         </TextField>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField select label="Country" value={selectedCountryId} onChange={(e) => setSelectedCountryId(e.target.value)} fullWidth size="medium"
-                          sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={{ ...sharedMenuProps, onOpen: fetchCountries }}
-                          InputProps={{ startAdornment: <LocationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }}>
-                          {countriesLoading
-                            ? <MenuItem disabled><Typography sx={{ fontFamily: FONT, fontSize: '13px', color: C.muted }}>Loading…</Typography></MenuItem>
-                            : countriesLoaded
-                              ? countriesData.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)
-                              : <MenuItem value={sessionCountryId || ''}>{sessionCountry || 'Select country'}</MenuItem>}
-                        </TextField>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Landmark" value={customer.landmark} onChange={handleCustomerChange('landmark')} fullWidth size="medium" sx={formFieldSx} placeholder="e.g., Near City Mall"
-                          InputProps={{ startAdornment: <LandscapeIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Street" value={customer.street} onChange={handleCustomerChange('street')} fullWidth size="medium" sx={formFieldSx}
-                          InputProps={{ startAdornment: <SignpostIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField label="Block" value={customer.block} onChange={handleCustomerChange('block')} fullWidth size="medium" sx={formFieldSx}
-                          InputProps={{ startAdornment: <ApartmentIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField label="Building" value={customer.building} onChange={handleCustomerChange('building')} fullWidth size="medium" sx={formFieldSx}
-                          InputProps={{ startAdornment: <DomainIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField label="Floor" value={customer.floor} onChange={handleCustomerChange('floor')} fullWidth size="medium" sx={formFieldSx}
-                          InputProps={{ startAdornment: <LayersIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Net Sale" value={customer.net_sale} fullWidth size="medium" disabled sx={formFieldDisabledSx}
-                          InputProps={{ startAdornment: <MonetizationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                      </Grid>
-                    </Grid>
-                  </Box>
-
-                  <Divider sx={{ my: 5, borderColor: alpha(C.purple, 0.1) }} />
-
-                  {/* ── Delivery & Scheduling ── */}
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
-                      <LocalShippingIcon sx={{ color: C.purple, fontSize: { xs: 20, sm: 24 } }} />
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: C.purple, fontFamily: FONT, fontSize: { xs: '15px', sm: '18px' } }}>Delivery & Scheduling</Typography>
-                    </Box>
-                    <Grid container spacing={{ xs: 2, sm: 3 }}>
-                      <Grid item xs={12} md={6}>
-                        <DatePicker
-                          selected={order.scheduledDate ? new Date(order.scheduledDate) : null}
-                          onChange={(date) => handleOrderChange("scheduledDate")({ target: { value: date ? dayjs(date).format("YYYY-MM-DDTHH:mm") : "" } })}
-                          showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="dd/MM/yyyy HH:mm"
-                          customInput={
-                            <TextField label="Scheduled Date & Time" fullWidth size="medium" sx={formFieldSx} InputLabelProps={{ shrink: true }}
-                              InputProps={{ startAdornment: <CalendarTodayIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 }, cursor: 'pointer' }} /> }}
-                              helperText={isScheduled ? 'Order will be saved as draft until this date' : 'Order will be processed immediately'} />
-                          }
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField select label="Branch" value={order.branch} onChange={handleOrderChange('branch')} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}
-                          InputProps={{ startAdornment: <StoreIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }}>
-                          {warehousesData.length > 0 ? warehousesData.map(wh => <MenuItem key={wh.id} value={wh.id}>{wh.name}</MenuItem>) : <MenuItem disabled>No branches available</MenuItem>}
-                        </TextField>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField select label="Delivery Type" value={order.deliveryTypeId} onChange={handleOrderChange('deliveryTypeId')} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}>
-                          {deliveryTypesData.length > 0 ? deliveryTypesData.map(type => <MenuItem key={type.id} value={type.id}>{type.name}</MenuItem>) : <MenuItem disabled>Loading…</MenuItem>}
-                        </TextField>
-                      </Grid>
-                      {selectedTypeObj && (
-                        <Grid item xs={12} md={6}>
-                          <TextField select label="Delivery Method" value={order.deliveryMethodId} onChange={handleOrderChange('deliveryMethodId')} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}>
-                            {selectedTypeObj.methods.map(method => <MenuItem key={method.id} value={method.id}>{method.name}</MenuItem>)}
-                          </TextField>
-                        </Grid>
                       )}
-                      {selectedMethodObj?.is_delivery_company && (
-                        <Grid item xs={12} md={6}>
-                          <TextField label="Delivery Company Order ID *" value={order.deliveryCompanyOrderId} onChange={handleOrderChange('deliveryCompanyOrderId')} fullWidth size="medium" sx={formFieldSx}
-                            placeholder="e.g., #12345" error={!order.deliveryCompanyOrderId?.trim()} helperText={!order.deliveryCompanyOrderId?.trim() ? 'Required for this delivery method' : ''} />
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Box>
-
-                  <Divider sx={{ my: 5, borderColor: alpha(C.purple, 0.1) }} />
-
-                  {/* ── Prescription ── */}
-                  <Box sx={{ mb: 5, position: 'relative' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1.5 }}>
-                      <PersonIcon sx={{ color: C.purple, fontSize: { xs: 20, sm: 24 } }} />
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: C.purple, fontFamily: FONT, fontSize: { xs: '15px', sm: '18px' } }}>Prescription</Typography>
-                      <Switch checked={hasPrescription} onChange={handlePrescriptionChange} size="small"
-                        sx={{ ml: 0.5, '& .MuiSwitch-switchBase.Mui-checked': { color: C.teal }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.teal } }} />
                     </Box>
-                    <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ position: 'relative', zIndex: 15 }}>
-                      {hasPrescription && (
-                        <>
-                          <Grid item xs={12} md={6}>
-                            <Box sx={{ position: 'relative' }}>
-                              <TextField ref={doctorSearchRef} label="Search Doctor" placeholder="Name, Phone, or Clinic Name"
-                                onChange={handleDoctorSearch} fullWidth size="medium" sx={formFieldSx}
-                                InputProps={{ startAdornment: <PersonIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
-                              <Popper open={Boolean(doctorAnchorEl) && doctorSearchResults.length > 0} anchorEl={doctorAnchorEl} placement="bottom-start" style={{ zIndex: 1400 }} modifiers={[{ name: 'offset', options: { offset: [0, 8] } }]}>
-                                <Paper sx={{ width: doctorSearchRef.current?.offsetWidth, maxHeight: 280, overflowY: 'auto', border: '1.5px solid #e8e4f0', borderRadius: R.cardSm, boxShadow: '0 8px 24px rgba(126, 87, 194, 0.15)' }}>
-                                  <List sx={{ p: 0 }}>
-                                    {doctorSearchResults.map((doc, index) => (
-                                      <ListItem key={index} disablePadding>
-                                        <ListItemButton onClick={() => selectDoctor(doc)} sx={{ fontFamily: FONT, py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 }, '&:hover': { backgroundColor: alpha(C.purple, 0.06), transform: 'translateX(4px)' } }}>
-                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                                            {doc.image_128 && <Box component="img" src={`data:image/png;base64,${doc.image_128}`} sx={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
-                                            <ListItemText primary={doc.doctor_name} secondary={`${doc.clinic_name || 'No Clinic'} • ${doc.doctor_phone || 'No Phone'}`}
-                                              primaryTypographyProps={{ fontFamily: FONT, fontWeight: 600, fontSize: { xs: '13px', sm: '14px' } }}
-                                              secondaryTypographyProps={{ fontFamily: FONT, color: C.purple, fontWeight: 500, fontSize: { xs: '11px', sm: '12px' } }} sx={{ m: 0 }} />
-                                          </Box>
-                                        </ListItemButton>
-                                      </ListItem>
-                                    ))}
-                                  </List>
-                                </Paper>
-                              </Popper>
-                            </Box>
-                          </Grid>
-                          {doctor.id && (
-                            <>
-                              <Grid item xs={12} md={6}><TextField label="Doctor Name" value={doctor.doctor_name} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <PersonIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
-                              <Grid item xs={12} md={6}><TextField label="Doctor Phone" value={doctor.doctor_phone} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <PhoneIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
-                              <Grid item xs={12} md={6}><TextField label="Clinic Name" value={doctor.clinic_name} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <StoreIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Grid>
                   </Box>
-
                 </Box>
 
-                {/* ── Order Lines ── */}
-                <OrderLines
-                  initialLines={isDraftOrder ? orderLinesData : []}
-                  onLinesChange={handleLinesChange}
-                  onDiscountStatusChange={(status) => setDiscountStatus(status)}
-                  onDeliveryChargeModeChange={setDeliveryChargeMode}
-                  initialDeliveryChargeMode={deliveryChargeMode}
-                  onAskDiscountPermission={handleAskDiscountPermission}
-                  canAskDiscountPermission={canAskDiscountPermission}
-                  deliveryType={selectedMethodObj?.is_delivery_company || false}
-                  deliveryCharge={order.deliveryCharge}
-                  onTermsAndConditionsChange={handleTermsAndConditionsChange}
-                  initialTermsAndConditions={termsAndConditions}
-                  productNotes={productNotes}
-                  onProductNotesChange={setProductNotes}
-                  appliedLoyalties={appliedLoyalties}
-                  onAppliedLoyaltiesChange={setAppliedLoyalties}
-                />
-
-                {/* ── Action Buttons ── */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
-                  <Button startIcon={<CancelIcon />} onClick={handleCancelOrder} sx={{
-                    borderColor: '#ef5350', color: '#ef5350', borderRadius: { xs: R.cardSm, sm: R.pill },
-                    px: { xs: 2, sm: 4 }, py: { xs: 1.2, sm: 1.5 }, fontWeight: 600, fontSize: { xs: '13px', sm: '15px' },
-                    fontFamily: FONT, textTransform: 'none', border: '2px solid #ef5350',
-                    '&:hover': { backgroundColor: alpha('#ef5350', 0.08), borderColor: '#d32f2f' },
-                  }}>Cancel Order</Button>
-
-                  <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
-                    <Button startIcon={<DraftsIcon />} onClick={() => handleSaveAsDraft(false)} sx={{
-                      borderColor: '#5d526f', color: '#5d526f', borderRadius: { xs: R.cardSm, sm: R.pill },
-                      px: { xs: 2, sm: 4 }, py: { xs: 1.2, sm: 1.5 }, fontWeight: 600, fontSize: { xs: '13px', sm: '15px' },
-                      fontFamily: FONT, textTransform: 'none', border: '2px solid #5d526f',
-                      '&:hover': { backgroundColor: alpha('#5d526f', 0.08) },
-                    }}>Save as Draft</Button>
-
-                    {/* Task 5: dynamic label + icon based on scheduled state */}
-                    <Button
-                      startIcon={isScheduled ? <ScheduleSendIcon /> : <SendIcon />}
-                      onClick={handleSubmit}
-                      sx={{
-                        backgroundColor: C.purple,
-                        color: 'white', borderRadius: { xs: R.cardSm, sm: R.pill },
-                        px: { xs: 3, sm: 6 }, py: { xs: 1.2, sm: 1.5 }, fontWeight: 600, fontSize: { xs: '13px', sm: '15px' },
-                        fontFamily: FONT, textTransform: 'none',
-                        boxShadow: isScheduled ? `0 6px 20px ${alpha(C.teal, 0.35)}` : `0 6px 20px ${alpha(C.purple, 0.35)}`,
-                        transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
-                        '&:hover': {
-                          backgroundColor: isScheduled ? C.tealDark : C.tealDark,
-                          boxShadow: `0 8px 28px ${alpha(C.teal, 0.40)}`,
-                        },
-                      }}>{submitLabel}</Button>
+                {/* ── Customer Details ── */}
+                <Box sx={{
+                  mb: 5,
+                  ...(customer.blacklist && {
+                    p: { xs: 2, sm: 2.5 },
+                    borderRadius: R.cardSm,
+                    border: `1.5px solid ${alpha(C.red, 0.30)}`,
+                    backgroundColor: alpha(C.red, 0.03),
+                  }),
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
+                    <PersonIcon sx={{ color: C.purple, fontSize: { xs: 20, sm: 24 } }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: C.purple, fontFamily: FONT, fontSize: { xs: '15px', sm: '18px' } }}>Customer Details</Typography>
                   </Box>
+                  <Grid container spacing={{ xs: 2, sm: 3 }}>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ position: 'relative' }}>
+                        <TextField label="Phone Number" value={customer.phone} onChange={handleCustomerChange('phone')} fullWidth size="medium" sx={formFieldSx}
+                          InputProps={{ startAdornment: <PhoneIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                        {searchResults.length > 0 && (
+                          <List sx={{ position: 'absolute', zIndex: 10, backgroundColor: 'white', width: '100%', maxHeight: 200, overflowY: 'auto', border: '1.5px solid #e8e4f0', borderRadius: R.cardSm, mt: 1, boxShadow: '0 8px 24px rgba(126, 87, 194, 0.15)' }}>
+                            {searchResults.map((c, index) => (
+                              <ListItem key={index} disablePadding>
+                                <ListItemButton onClick={() => selectCustomer(c)} sx={{ fontFamily: FONT, py: { xs: 1, sm: 1.25 }, '&:hover': { backgroundColor: alpha(C.purple, 0.06), transform: 'translateX(4px)' } }}>
+                                  <ListItemText primary={`${c.phone} - ${c.name}`} secondary={c.locations?.length > 1 ? `${c.locations.length} locations` : ''}
+                                    primaryTypographyProps={{ fontFamily: FONT, fontSize: { xs: '13px', sm: '14px' } }}
+                                    secondaryTypographyProps={{ fontFamily: FONT, color: C.purple, fontWeight: 500, fontSize: { xs: '12px', sm: '13px' } }} />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                          </List>
+                        )}
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField label="Customer Name" value={customer.name} onChange={handleCustomerChange('name')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <PersonIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField select label="Area" value={customer.area || ''} onChange={handleAreaChange} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}
+                        InputProps={{ startAdornment: <LocationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }}>
+                        {areasData.length > 0 ? areasData.map(area => <MenuItem key={area.id} value={area.id}>{area.name}</MenuItem>) : <MenuItem disabled>No areas available</MenuItem>}
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField select label="Country" value={selectedCountryId} onChange={(e) => setSelectedCountryId(e.target.value)} fullWidth size="medium"
+                        sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={{ ...sharedMenuProps, onOpen: fetchCountries }}
+                        InputProps={{ startAdornment: <LocationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }}>
+                        {countriesLoading
+                          ? <MenuItem disabled><Typography sx={{ fontFamily: FONT, fontSize: '13px', color: C.muted }}>Loading…</Typography></MenuItem>
+                          : countriesLoaded
+                            ? countriesData.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)
+                            : <MenuItem value={sessionCountryId || ''}>{sessionCountry || 'Select country'}</MenuItem>}
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField label="Landmark" value={customer.landmark} onChange={handleCustomerChange('landmark')} fullWidth size="medium" sx={formFieldSx} placeholder="e.g., Near City Mall"
+                        InputProps={{ startAdornment: <LandscapeIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField label="Street" value={customer.street} onChange={handleCustomerChange('street')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <SignpostIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField label="Block" value={customer.block} onChange={handleCustomerChange('block')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <ApartmentIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField label="Building" value={customer.building} onChange={handleCustomerChange('building')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <DomainIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField label="Floor" value={customer.floor} onChange={handleCustomerChange('floor')} fullWidth size="medium" sx={formFieldSx}
+                        InputProps={{ startAdornment: <LayersIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField label="Net Sale" value={customer.net_sale} fullWidth size="medium" disabled sx={formFieldDisabledSx}
+                        InputProps={{ startAdornment: <MonetizationOnIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                <Divider sx={{ my: 5, borderColor: alpha(C.purple, 0.1) }} />
+
+                {/* ── Delivery & Scheduling ── */}
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
+                    <LocalShippingIcon sx={{ color: C.purple, fontSize: { xs: 20, sm: 24 } }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: C.purple, fontFamily: FONT, fontSize: { xs: '15px', sm: '18px' } }}>Delivery & Scheduling</Typography>
+                  </Box>
+                  <Grid container spacing={{ xs: 2, sm: 3 }}>
+                    <Grid item xs={12} md={6}>
+                      <DatePicker
+                        selected={order.scheduledDate ? new Date(order.scheduledDate) : null}
+                        onChange={(date) => handleOrderChange("scheduledDate")({ target: { value: date ? dayjs(date).format("YYYY-MM-DDTHH:mm") : "" } })}
+                        showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="dd/MM/yyyy HH:mm"
+                        customInput={
+                          <TextField label="Scheduled Date & Time" fullWidth size="medium" sx={formFieldSx} InputLabelProps={{ shrink: true }}
+                            InputProps={{ startAdornment: <CalendarTodayIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 }, cursor: 'pointer' }} /> }}
+                            helperText={isScheduled ? 'Order will be saved as draft until this date' : 'Order will be processed immediately'} />
+                        }
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField select label="Branch" value={order.branch} onChange={handleOrderChange('branch')} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}
+                        InputProps={{ startAdornment: <StoreIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }}>
+                        {warehousesData.length > 0 ? warehousesData.map(wh => <MenuItem key={wh.id} value={wh.id}>{wh.name}</MenuItem>) : <MenuItem disabled>No branches available</MenuItem>}
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField select label="Delivery Type" value={order.deliveryTypeId} onChange={handleOrderChange('deliveryTypeId')} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}>
+                        {deliveryTypesData.length > 0 ? deliveryTypesData.map(type => <MenuItem key={type.id} value={type.id}>{type.name}</MenuItem>) : <MenuItem disabled>Loading…</MenuItem>}
+                      </TextField>
+                    </Grid>
+                    {selectedTypeObj && (
+                      <Grid item xs={12} md={6}>
+                        <TextField select label="Delivery Method" value={order.deliveryMethodId} onChange={handleOrderChange('deliveryMethodId')} fullWidth size="medium" sx={{ ...formFieldSx, minWidth: '250px' }} SelectProps={sharedMenuProps}>
+                          {selectedTypeObj.methods.map(method => <MenuItem key={method.id} value={method.id}>{method.name}</MenuItem>)}
+                        </TextField>
+                      </Grid>
+                    )}
+                    {selectedMethodObj?.is_delivery_company && (
+                      <Grid item xs={12} md={6}>
+                        <TextField label="Delivery Company Order ID *" value={order.deliveryCompanyOrderId} onChange={handleOrderChange('deliveryCompanyOrderId')} fullWidth size="medium" sx={formFieldSx}
+                          placeholder="e.g., #12345" error={!order.deliveryCompanyOrderId?.trim()} helperText={!order.deliveryCompanyOrderId?.trim() ? 'Required for this delivery method' : ''} />
+                      </Grid>
+                    )}
+                  </Grid>
+                </Box>
+
+                <Divider sx={{ my: 5, borderColor: alpha(C.purple, 0.1) }} />
+
+                {/* ── Prescription ── */}
+                <Box sx={{ mb: 5, position: 'relative' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1.5 }}>
+                    <PersonIcon sx={{ color: C.purple, fontSize: { xs: 20, sm: 24 } }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: C.purple, fontFamily: FONT, fontSize: { xs: '15px', sm: '18px' } }}>Prescription</Typography>
+                    <Switch checked={hasPrescription} onChange={handlePrescriptionChange} size="small"
+                      sx={{ ml: 0.5, '& .MuiSwitch-switchBase.Mui-checked': { color: C.teal }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: C.teal } }} />
+                  </Box>
+                  <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ position: 'relative', zIndex: 15 }}>
+                    {hasPrescription && (
+                      <>
+                        <Grid item xs={12} md={6}>
+                          <Box sx={{ position: 'relative' }}>
+                            <TextField ref={doctorSearchRef} label="Search Doctor" placeholder="Name, Phone, or Clinic Name"
+                              onChange={handleDoctorSearch} fullWidth size="medium" sx={formFieldSx}
+                              InputProps={{ startAdornment: <PersonIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} />
+                            <Popper open={Boolean(doctorAnchorEl) && doctorSearchResults.length > 0} anchorEl={doctorAnchorEl} placement="bottom-start" style={{ zIndex: 1400 }} modifiers={[{ name: 'offset', options: { offset: [0, 8] } }]}>
+                              <Paper sx={{ width: doctorSearchRef.current?.offsetWidth, maxHeight: 280, overflowY: 'auto', border: '1.5px solid #e8e4f0', borderRadius: R.cardSm, boxShadow: '0 8px 24px rgba(126, 87, 194, 0.15)' }}>
+                                <List sx={{ p: 0 }}>
+                                  {doctorSearchResults.map((doc, index) => (
+                                    <ListItem key={index} disablePadding>
+                                      <ListItemButton onClick={() => selectDoctor(doc)} sx={{ fontFamily: FONT, py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 }, '&:hover': { backgroundColor: alpha(C.purple, 0.06), transform: 'translateX(4px)' } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                                          {doc.image_128 && <Box component="img" src={`data:image/png;base64,${doc.image_128}`} sx={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                                          <ListItemText primary={doc.doctor_name} secondary={`${doc.clinic_name || 'No Clinic'} • ${doc.doctor_phone || 'No Phone'}`}
+                                            primaryTypographyProps={{ fontFamily: FONT, fontWeight: 600, fontSize: { xs: '13px', sm: '14px' } }}
+                                            secondaryTypographyProps={{ fontFamily: FONT, color: C.purple, fontWeight: 500, fontSize: { xs: '11px', sm: '12px' } }} sx={{ m: 0 }} />
+                                        </Box>
+                                      </ListItemButton>
+                                    </ListItem>
+                                  ))}
+                                </List>
+                              </Paper>
+                            </Popper>
+                          </Box>
+                        </Grid>
+                        {doctor.id && (
+                          <>
+                            <Grid item xs={12} md={6}><TextField label="Doctor Name" value={doctor.doctor_name} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <PersonIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
+                            <Grid item xs={12} md={6}><TextField label="Doctor Phone" value={doctor.doctor_phone} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <PhoneIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
+                            <Grid item xs={12} md={6}><TextField label="Clinic Name" value={doctor.clinic_name} fullWidth size="medium" disabled sx={formFieldDisabledSx} InputProps={{ startAdornment: <StoreIcon sx={{ color: C.muted, mr: 1, fontSize: { xs: 18, sm: 20 } }} /> }} /></Grid>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </Grid>
+                </Box>
+
+              </Box>
+
+              {/* ── Order Lines ── */}
+              <OrderLines
+                initialLines={isDraftOrder ? orderLinesData : []}
+                onLinesChange={handleLinesChange}
+                onDiscountStatusChange={(status) => setDiscountStatus(status)}
+                onDeliveryChargeModeChange={setDeliveryChargeMode}
+                initialDeliveryChargeMode={deliveryChargeMode}
+                onAskDiscountPermission={handleAskDiscountPermission}
+                canAskDiscountPermission={canAskDiscountPermission}
+                deliveryType={selectedMethodObj?.is_delivery_company || false}
+                deliveryCharge={order.deliveryCharge}
+                onTermsAndConditionsChange={handleTermsAndConditionsChange}
+                initialTermsAndConditions={termsAndConditions}
+                productNotes={productNotes}
+                onProductNotesChange={setProductNotes}
+                appliedLoyalties={appliedLoyalties}
+                onAppliedLoyaltiesChange={setAppliedLoyalties}
+              />
+
+              {/* ── Action Buttons ── */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+                <Button startIcon={<CancelIcon />} onClick={handleCancelOrder} sx={{
+                  borderColor: '#ef5350', color: '#ef5350', borderRadius: { xs: R.cardSm, sm: R.pill },
+                  px: { xs: 2, sm: 4 }, py: { xs: 1.2, sm: 1.5 }, fontWeight: 600, fontSize: { xs: '13px', sm: '15px' },
+                  fontFamily: FONT, textTransform: 'none', border: '2px solid #ef5350',
+                  '&:hover': { backgroundColor: alpha('#ef5350', 0.08), borderColor: '#d32f2f' },
+                }}>Cancel Order</Button>
+
+                <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+                  <Button startIcon={<DraftsIcon />} onClick={() => handleSaveAsDraft(false)} sx={{
+                    borderColor: '#5d526f', color: '#5d526f', borderRadius: { xs: R.cardSm, sm: R.pill },
+                    px: { xs: 2, sm: 4 }, py: { xs: 1.2, sm: 1.5 }, fontWeight: 600, fontSize: { xs: '13px', sm: '15px' },
+                    fontFamily: FONT, textTransform: 'none', border: '2px solid #5d526f',
+                    '&:hover': { backgroundColor: alpha('#5d526f', 0.08) },
+                  }}>Save as Draft</Button>
+
+                  {/* Task 5: dynamic label + icon based on scheduled state */}
+                  <Button
+                    startIcon={isScheduled ? <ScheduleSendIcon /> : <SendIcon />}
+                    onClick={handleSubmit}
+                    sx={{
+                      backgroundColor: C.purple,
+                      color: 'white', borderRadius: { xs: R.cardSm, sm: R.pill },
+                      px: { xs: 3, sm: 6 }, py: { xs: 1.2, sm: 1.5 }, fontWeight: 600, fontSize: { xs: '13px', sm: '15px' },
+                      fontFamily: FONT, textTransform: 'none',
+                      boxShadow: isScheduled ? `0 6px 20px ${alpha(C.teal, 0.35)}` : `0 6px 20px ${alpha(C.purple, 0.35)}`,
+                      transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+                      '&:hover': {
+                        backgroundColor: isScheduled ? C.tealDark : C.tealDark,
+                        boxShadow: `0 8px 28px ${alpha(C.teal, 0.40)}`,
+                      },
+                    }}>{submitLabel}</Button>
                 </Box>
               </Box>
             </Box>
