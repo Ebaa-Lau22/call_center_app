@@ -302,7 +302,7 @@ export default function DriverAssignmentsList() {
                             </Box>
                           </Box>
                           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.3, flexShrink: 0 }}>
-                            <Typography sx={{ ...f, fontSize: 13, color: P }}>{totalAmount.toFixed(2)} {firstOrder.currency}</Typography>
+                            <Typography sx={{ ...f, fontSize: 13, color: P }}>{totalAmount.toFixed(3)} {firstOrder.currency}</Typography>
                             {paidOnline && (
                               <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
                                 <VerifiedIcon sx={{ fontSize: 11, color: T }} />
@@ -317,7 +317,7 @@ export default function DriverAssignmentsList() {
                       {isPending && (
                         <Box sx={{ mt: 1.2, pt: 1.2, borderTop: "1px solid rgba(126,87,194,0.07)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <Box>
-                            <Typography sx={{ ...f, fontSize: 14, color: C.text, mt: 0.2 }}>{totalAmount.toFixed(2)} {firstOrder?.currency || ""}</Typography>
+                            <Typography sx={{ ...f, fontSize: 14, color: C.text, mt: 0.2 }}>{totalAmount.toFixed(3)} {firstOrder?.currency || ""}</Typography>
                           </Box>
                           <Typography sx={{ ...f, fontSize: 12, color: P }}>Review →</Typography>
                         </Box>

@@ -265,12 +265,12 @@ export default function DriverAssignmentDetails() {
   const submitPayment = async () => {
     const orderTotal = order?.amount_total || 0;
     const amountDiff = totalEntered - orderTotal;
-    if (Math.abs(amountDiff) > 0.01) {
-      alert(`Total entered (${totalEntered.toFixed(2)}) must equal the order total (${orderTotal.toFixed(2)}).\n\nUse "Returned" for any unrecovered amount.`);
+    if (Math.abs(amountDiff) > 0.001) {
+      alert(`Total entered (${totalEntered.toFixed(3)}) must equal the order total (${orderTotal.toFixed(3)}).\n\nUse "Returned" for any unrecovered amount.`);
       return;
     }
 
-    if (Math.abs(returnedAmount - orderTotal) < 0.01) {
+    if (Math.abs(returnedAmount - orderTotal) < 0.001) {
       setPayDialogOpen(false);
       await callReturnOrderAPI("Full order returned — entered via receive money dialog");
       return;
@@ -309,7 +309,7 @@ export default function DriverAssignmentDetails() {
   }
 
   const amountDiff = totalEntered - (order?.amount_total || 0);
-  const amountOk = Math.abs(amountDiff) < 0.01;
+  const amountOk = Math.abs(amountDiff) < 0.001;
 
   return (
     <Box sx={{ minHeight: "100vh", backgroundColor: C.purpleBg, fontFamily: FONT, pb: 5 }}>
@@ -460,9 +460,9 @@ export default function DriverAssignmentDetails() {
                             <Typography sx={{ ...f, fontSize: 13, color: C.text, mb: 1 }}>{line.product_name}</Typography>
                             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
                               <MiniStat label="Qty" value={line.quantity} />
-                              <MiniStat label="Unit price" value={`${Number(line.price_unit).toFixed(2)} ${order.currency}`} />
+                              <MiniStat label="Unit price" value={`${Number(line.price_unit).toFixed(3)} ${order.currency}`} />
                               {line.discount > 0 && <MiniStat label="Discount" value={`${line.discount}%`} color={C.gold} />}
-                              <MiniStat label="Subtotal" value={`${Number(line.subtotal).toFixed(2)} ${order.currency}`} color={P} />
+                              <MiniStat label="Subtotal" value={`${Number(line.subtotal).toFixed(3)} ${order.currency}`} color={P} />
                             </Box>
                           </Box>
                         );
@@ -472,12 +472,12 @@ export default function DriverAssignmentDetails() {
                     <Divider sx={{ my: 1.5, borderColor: "#f0eef5" }} />
                     {hasDiscount && (
                       <>
-                        <Row2 label="Subtotal before discounts" value={`${Number(order.amount_before_discount).toFixed(2)} ${order.currency}`} />
-                        <Row2 label="Total discounts" value={`−${Number(order.amount_discount).toFixed(2)} ${order.currency}`} color={C.gold} />
+                        <Row2 label="Subtotal before discounts" value={`${Number(order.amount_before_discount).toFixed(3)} ${order.currency}`} />
+                        <Row2 label="Total discounts" value={`−${Number(order.amount_discount).toFixed(3)} ${order.currency}`} color={C.gold} />
                         <Divider sx={{ my: 1, borderColor: "#f0eef5" }} />
                       </>
                     )}
-                    <Row2 label="Total" value={`${Number(order.amount_total).toFixed(2)} ${order.currency}`} color={P} strong />
+                    <Row2 label="Total" value={`${Number(order.amount_total).toFixed(3)} ${order.currency}`} color={P} strong />
                   </Card>
                 )}
 
@@ -489,7 +489,7 @@ export default function DriverAssignmentDetails() {
                       {orderPaymnets.map((pm, i) => (
                         <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <Typography sx={{ ...f, fontSize: 13, color: C.mutedDark }}>{pm.name}</Typography>
-                          <Typography sx={{ ...f, fontSize: 13, color: P, fontWeight: 500 }}>{Number(pm.amount).toFixed(2)} {order?.currency}</Typography>
+                          <Typography sx={{ ...f, fontSize: 13, color: P, fontWeight: 500 }}>{Number(pm.amount).toFixed(3)} {order?.currency}</Typography>
                         </Box>
                       ))}
                     </Box>
@@ -655,10 +655,10 @@ export default function DriverAssignmentDetails() {
             return (
               <Box sx={{ mt: 1.5, px: 1.5, py: 0.9, borderRadius: R.soft, border: `1px solid ${alpha(col, 0.22)}`, backgroundColor: alpha(col, 0.04), display: "flex", justifyContent: "space-between" }}>
                 <Typography sx={{ ...f, fontSize: 12, color: col }}>
-                  {amountOk ? "✓ Matches" : amountDiff > 0 ? `Over by ${amountDiff.toFixed(2)}` : `Remaining ${Math.abs(amountDiff).toFixed(2)}`}
+                  {amountOk ? "✓ Matches" : amountDiff > 0 ? `Over by ${amountDiff.toFixed(3)}` : `Remaining ${Math.abs(amountDiff).toFixed(3)}`}
                 </Typography>
                 <Typography sx={{ ...f, fontSize: 12, color: col }}>
-                  {totalEntered.toFixed(2)} / {total.toFixed(2)} {cur}
+                  {totalEntered.toFixed(3)} / {total.toFixed(3)} {cur}
                 </Typography>
               </Box>
             );

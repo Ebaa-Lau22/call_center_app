@@ -147,9 +147,9 @@ export default function OrderDetailsReadOnly() {
       maxAllowed += lineTotal * ((l.max_discount ?? 0) / 100);
     });
     return {
-      discountValue: discountValue.toFixed(2),
-      maxAllowed: maxAllowed.toFixed(2),
-      difference: Math.max(0, discountValue - maxAllowed).toFixed(2),
+      discountValue: discountValue.toFixed(3),
+      maxAllowed: maxAllowed.toFixed(3),
+      difference: Math.max(0, discountValue - maxAllowed).toFixed(3),
     };
   }, [orderLinesData]);
 

@@ -271,7 +271,7 @@ export default function OrderLines({
     return {
       revenue,
       margin,
-      percentage: (revenue > 0 ? (margin / revenue) * 100 : 0).toFixed(2),
+      percentage: (revenue > 0 ? (margin / revenue) * 100 : 0).toFixed(3),
       discountTotal,
       revenueBeforeDiscount,
     };
@@ -818,7 +818,7 @@ export default function OrderLines({
                                   <TextField type="number" size="small" value={line.price} onChange={(e) => updatePrice(line.id, e.target.value)} inputProps={{ min: 0, style: { textAlign: 'center', fontWeight: 600, fontSize: '12px', padding: '4px 6px' } }} sx={{ width: '52px', '& .MuiOutlinedInput-root': { borderRadius: R.soft, fontFamily: FONT, backgroundColor: alpha(C.teal, 0.07), '& fieldset': { borderColor: alpha(C.teal, 0.4) }, '&:hover fieldset': { borderColor: C.teal }, '&.Mui-focused fieldset': { borderColor: C.teal } }, '& input[type=number]': { MozAppearance: 'textfield' }, '& input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }} />
                                   <Typography sx={{ fontFamily: FONT, fontSize: '11px', color: C.muted, flexShrink: 0 }}>{currency_symbol}</Typography>
                                 </Box>
-                              ) : `${(line.price || 0).toFixed(2)} ${currency_symbol}`}
+                              ) : `${(line.price || 0).toFixed(3)} ${currency_symbol}`}
                             </TableCell>
 
                             {/* disc % */}
@@ -836,14 +836,14 @@ export default function OrderLines({
 
                             {/* subtotal before discount */}
                             <TableCell sx={{ ...tdSx, color: C.mutedDark }}>
-                              {isService ? '—' : `${lineGross.toFixed(2)} ${currency_symbol}`}
+                              {isService ? '—' : `${lineGross.toFixed(3)} ${currency_symbol}`}
                             </TableCell>
 
                             {/* subtotal after discount */}
                             <TableCell sx={numSx}>
-                              {(line.price * line.qty).toFixed(2) !== lineNet.toFixed(2) || line.isReward
-                                ? <span style={{ color: line.isReward ? C.pink : C.purple }}>{lineNet.toFixed(2)} {currency_symbol}</span>
-                                : `${lineNet.toFixed(2)} ${currency_symbol}`
+                              {(line.price * line.qty).toFixed(3) !== lineNet.toFixed(3) || line.isReward
+                                ? <span style={{ color: line.isReward ? C.pink : C.purple }}>{lineNet.toFixed(3)} {currency_symbol}</span>
+                                : `${lineNet.toFixed(3)} ${currency_symbol}`
                               }
                             </TableCell>
 
@@ -896,18 +896,18 @@ export default function OrderLines({
                     <Box sx={{ mb: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 0.4 }}>
                         <Typography sx={{ color: C.mutedDark, fontFamily: FONT, fontSize: '13px' }}>Before Discount</Typography>
-                        <Typography sx={{ color: C.mutedDark, fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>{totals.revenueBeforeDiscount.toFixed(2)} {currency_symbol}</Typography>
+                        <Typography sx={{ color: C.mutedDark, fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>{totals.revenueBeforeDiscount.toFixed(3)} {currency_symbol}</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 0.4 }}>
                         <Typography sx={{ color: alpha(C.gold, 0.80), fontFamily: FONT, fontSize: '13px' }}>Discount</Typography>
-                        <Typography sx={{ color: alpha(C.gold, 0.80), fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>−{totals.discountTotal.toFixed(2)} {currency_symbol}</Typography>
+                        <Typography sx={{ color: alpha(C.gold, 0.80), fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>−{totals.discountTotal.toFixed(3)} {currency_symbol}</Typography>
                       </Box>
                       <Box sx={{ borderBottom: `1.5px solid ${alpha(C.gold, 0.20)}`, mb: 0.8 }} />
                     </Box>
                   )}
                   <Typography variant="body2" sx={{ color: C.muted, fontFamily: FONT, mb: 0.5, fontSize: '12px' }}>{totals.discountTotal > 0 ? 'Final Total' : 'Total Amount'}</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: C.purple, fontFamily: FONT, fontSize: { xs: '22px', sm: '28px' } }}>{totals.revenue.toFixed(2)} {currency_symbol}</Typography>
-                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#616161', fontFamily: FONT, fontWeight: 500, fontSize: '11px' }}>Margin: {totals.margin.toFixed(2)} {currency_symbol} ({totals.percentage}%)</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: C.purple, fontFamily: FONT, fontSize: { xs: '22px', sm: '28px' } }}>{totals.revenue.toFixed(3)} {currency_symbol}</Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#616161', fontFamily: FONT, fontWeight: 500, fontSize: '11px' }}>Margin: {totals.margin.toFixed(3)} {currency_symbol} ({totals.percentage}%)</Typography>
                 </Box>
               </Box>
 

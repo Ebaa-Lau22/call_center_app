@@ -406,7 +406,7 @@ export default function SaleOrders() {
                             <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.date)}</TableCell>
                             <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.commitment_date) || '-'}</TableCell>
                             {groupBy !== 'branch' && <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.branch || '-'}</TableCell>}
-                            <TableCell sx={{ fontFamily: FONT, color: P, fontWeight: 700, fontSize: '13.5px' }}>{Number(row.amount_total).toFixed(2)} {row.currency || '$'}</TableCell>
+                            <TableCell sx={{ fontFamily: FONT, color: P, fontWeight: 700, fontSize: '13.5px' }}>{Number(row.amount_total).toFixed(3)} {row.currency || '$'}</TableCell>
                             <TableCell>{renderStatusChip(row.state)}</TableCell>
                           </TableRow>
                         ))
@@ -618,7 +618,7 @@ function GroupRow({ groupName, orders, renderStatus, onRowClick, groupBy }) {
                       <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.date)}</TableCell>
                       <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{utcOdooToLocal(row.commitment_date) || '-'}</TableCell>
                       {groupBy !== 'branch' && <TableCell sx={{ fontFamily: FONT, color: '#666', fontSize: '13px' }}>{row.branch || '-'}</TableCell>}
-                      <TableCell sx={{ fontFamily: FONT, color: P, fontWeight: 700, fontSize: '13px' }}>{Number(row.amount_total).toFixed(2)} {row.currency || '$'}</TableCell>
+                      <TableCell sx={{ fontFamily: FONT, color: P, fontWeight: 700, fontSize: '13px' }}>{Number(row.amount_total).toFixed(3)} {row.currency || '$'}</TableCell>
                       <TableCell>{renderStatus(row.state)}</TableCell>
                     </TableRow>
                   ))}

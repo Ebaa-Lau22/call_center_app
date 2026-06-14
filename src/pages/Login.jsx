@@ -15,26 +15,26 @@ import {
   alpha,
   CircularProgress,
 } from '@mui/material';
-import PersonIcon         from '@mui/icons-material/Person';
-import PersonOutlineIcon  from '@mui/icons-material/PersonOutline';
-import LockIcon           from '@mui/icons-material/Lock';
-import Visibility         from '@mui/icons-material/Visibility';
-import VisibilityOff      from '@mui/icons-material/VisibilityOff';
+import PersonIcon from '@mui/icons-material/Person';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import LockIcon from '@mui/icons-material/Lock';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
-const THEME_PURPLE    = '#7e57c2';
-const DARK_PURPLE     = '#5a3f8f';
+const THEME_PURPLE = '#7e57c2';
+const DARK_PURPLE = '#5a3f8f';
 const LIGHT_PURPLE_BG = '#faf9fc';
-const ACCENT_TEAL     = '#1dd1a1';
-const bannerGradient  = `linear-gradient(90deg, ${ACCENT_TEAL}, ${THEME_PURPLE}, ${ACCENT_TEAL})`;
+const ACCENT_TEAL = '#1dd1a1';
+const bannerGradient = `linear-gradient(90deg, ${ACCENT_TEAL}, ${THEME_PURPLE}, ${ACCENT_TEAL})`;
 
 import { R } from '../theme/ccTheme';
 
 export default function LoginPage() {
-  const [username,     setUsername]     = useState('');
-  const [password,     setPassword]     = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error,        setError]        = useState('');
-  const [loading,      setLoading]      = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
   const navigate = useNavigate();
@@ -70,15 +70,32 @@ export default function LoginPage() {
     },
   };
 
+  const encryptPassword = async (plain) => {
+    const { data } = await axios.post(
+      '/api/call_center/auth/public_key',
+      { params: {} },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    const spki = Uint8Array.from(atob(data.result.public_key), (c) => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey(
+      'spki', spki, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
+    );
+    const cipher = await crypto.subtle.encrypt(
+      { name: 'RSA-OAEP' }, key, new TextEncoder().encode(plain)
+    );
+    return btoa(String.fromCharCode(...new Uint8Array(cipher)));
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
+      const encrypted_password = await encryptPassword(password);
       const response = await axios.post(
         '/api/call_center/auth/login',
-        { params: { username, password } },
+        { params: { username, encrypted_password } },
         { withCredentials: true, headers: { 'Content-Type': 'application/json' } }
       );
 
@@ -94,14 +111,14 @@ export default function LoginPage() {
         if (result.token) localStorage.setItem('cc_auth_token', result.token);
 
         const userData = {
-          id:                   result.user_id,
-          name:                 result.user_name,
-          isDriver:             result.is_driver,
+          id: result.user_id,
+          name: result.user_name,
+          isDriver: result.is_driver,
           isCallCenterEmployee: result.is_call_center_employee,
-          isManager:            result.is_call_center_manager,
+          isManager: result.is_call_center_manager,
         };
 
-        localStorage.setItem('user_data',    JSON.stringify(userData));
+        localStorage.setItem('user_data', JSON.stringify(userData));
         localStorage.setItem('company_data', JSON.stringify(result.company_info));
 
         if (result.is_driver) {
@@ -224,7 +241,7 @@ export default function LoginPage() {
                     animation: 'slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '@keyframes slideDown': {
                       from: { opacity: 0, transform: 'translateY(-16px)' },
-                      to:   { opacity: 1, transform: 'translateY(0)' },
+                      to: { opacity: 1, transform: 'translateY(0)' },
                     },
                   }}
                 >

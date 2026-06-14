@@ -69,7 +69,7 @@ export default function OrderLinesReadOnly({
     return {
       revenue,
       margin,
-      percentage: (revenue > 0 ? (margin / revenue) * 100 : 0).toFixed(2),
+      percentage: (revenue > 0 ? (margin / revenue) * 100 : 0).toFixed(3),
       discountTotal,
       revenueBeforeDiscount,
     };
@@ -209,7 +209,7 @@ export default function OrderLinesReadOnly({
 
                             {/* price */}
                             <TableCell sx={tdSx}>
-                              {(line.price || 0).toFixed(2)} {currency_symbol}
+                              {(line.price || 0).toFixed(3)} {currency_symbol}
                             </TableCell>
 
                             {/* disc % */}
@@ -227,12 +227,12 @@ export default function OrderLinesReadOnly({
 
                             {/* subtotal before discount */}
                             <TableCell sx={{ ...tdSx, color: C.mutedDark }}>
-                              {isServiceRow ? '—' : `${lineGross.toFixed(2)} ${currency_symbol}`}
+                              {isServiceRow ? '—' : `${lineGross.toFixed(3)} ${currency_symbol}`}
                             </TableCell>
 
                             {/* subtotal after discount */}
                             <TableCell sx={{ ...tdSx, fontWeight: 600, color: isReward ? C.pink : C.purple }}>
-                              {isReward ? `0.00 ${currency_symbol}` : `${lineNet.toFixed(2)} ${currency_symbol}`}
+                              {isReward ? `0.00 ${currency_symbol}` : `${lineNet.toFixed(3)} ${currency_symbol}`}
                             </TableCell>
                           </TableRow>
 
@@ -269,19 +269,19 @@ export default function OrderLinesReadOnly({
                     <Box sx={{ mb: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 0.4 }}>
                         <Typography sx={{ color: C.mutedDark, fontFamily: FONT, fontSize: '13px' }}>Before Discount</Typography>
-                        <Typography sx={{ color: C.mutedDark, fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>{totals.revenueBeforeDiscount.toFixed(2)} {currency_symbol}</Typography>
+                        <Typography sx={{ color: C.mutedDark, fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>{totals.revenueBeforeDiscount.toFixed(3)} {currency_symbol}</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 0.4 }}>
                         <Typography sx={{ color: alpha(C.gold, 0.80), fontFamily: FONT, fontSize: '13px' }}>Discount</Typography>
-                        <Typography sx={{ color: alpha(C.gold, 0.80), fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>−{totals.discountTotal.toFixed(2)} {currency_symbol}</Typography>
+                        <Typography sx={{ color: alpha(C.gold, 0.80), fontFamily: FONT, fontSize: '13px', fontWeight: 600 }}>−{totals.discountTotal.toFixed(3)} {currency_symbol}</Typography>
                       </Box>
                       <Box sx={{ borderBottom: `1.5px solid ${alpha(C.gold, 0.20)}`, mb: 0.8 }} />
                     </Box>
                   )}
                   <Typography variant="body2" sx={{ color: C.muted, fontFamily: FONT, mb: 0.5, fontSize: '12px' }}>{totals.discountTotal > 0 ? 'Final Total' : 'Total Amount'}</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: C.purple, fontFamily: FONT, fontSize: { xs: '22px', sm: '28px' } }}>{totals.revenue.toFixed(2)} {currency_symbol}</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: C.purple, fontFamily: FONT, fontSize: { xs: '22px', sm: '28px' } }}>{totals.revenue.toFixed(3)} {currency_symbol}</Typography>
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#616161', fontFamily: FONT, fontWeight: 500, fontSize: '11px' }}>
-                    Margin: {totals.margin.toFixed(2)} {currency_symbol} ({totals.percentage}%)
+                    Margin: {totals.margin.toFixed(3)} {currency_symbol} ({totals.percentage}%)
                   </Typography>
                 </Box>
               </Box>
